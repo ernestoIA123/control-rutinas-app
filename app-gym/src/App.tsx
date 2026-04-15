@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "./lib/supabase";
 
 type SeriesItem = {
   id: number;
@@ -19,6 +20,20 @@ type Routine = {
   name: string;
   createdAt: number;
 };
+
+type ValidateAccessResponse = {
+  ok: boolean;
+  exists?: boolean;
+  access_active?: boolean;
+  subscription_status?: string;
+  plan?: string;
+  should_show_paywall?: boolean;
+  message?: string;
+};
+
+const BACKEND_URL = "https://control-rutinas-backend-production.up.railway.app";
+// 🔥 Ya no forzamos redirección automática al login para evitar el parpadeo
+const PLAN_NAME = "Plan mensual: control de rutinas";
 
 const neon = "#b7ff31";
 const neonSoft = "#eaffb8";
@@ -50,13 +65,16 @@ function formatSeconds(total: number) {
 
 function groupByRoutine(series: SeriesItem[]) {
   const map = new Map<number, SeriesItem[]>();
+
   for (const item of series) {
     if (!map.has(item.routineId)) map.set(item.routineId, []);
     map.get(item.routineId)!.push(item);
   }
+
   for (const [, items] of map) {
     items.sort((a, b) => a.setNumber - b.setNumber);
   }
+
   return map;
 }
 
@@ -110,9 +128,204 @@ export default function App() {
   const [absorbingSeriesId, setAbsorbingSeriesId] = useState<number | null>(null);
   const [pulseTick, setPulseTick] = useState(0);
   const [showCompleted, setShowCompleted] = useState(false);
+
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+
   const timerRef = useRef<number | null>(null);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  async function validateAccess(emailToCheck?: string) {
+    const cleanEmail = (emailToCheck || emailInput || userEmail).trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setHasAccess(false);
+      setCheckingAccess(false);
+      setAccessMessage("No hay sesión activa. Inicia sesión primero.");
+      return;
+    }
+
+    try {
+      setCheckingAccess(true);
+      setAccessMessage("");
+      setUserEmail(cleanEmail);
+      setEmailInput(cleanEmail);
+
+      const response = await fetch(`${BACKEND_URL}/validate-access`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+
+      const data: ValidateAccessResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "No se pudo validar el acceso.");
+      }
+
+      const active = Boolean(data?.access_active);
+      setHasAccess(active);
+
+      if (!active) {
+        setAccessMessage(
+          data?.message || "Tu plan mensual no está activo. Actívalo para usar la app web."
+        );
+      } else {
+        setAccessMessage("");
+      }
+    } catch (error) {
+      console.error("Error validando acceso:", error);
+      setHasAccess(false);
+      setAccessMessage("No se pudo validar tu acceso. Intenta de nuevo.");
+    } finally {
+      setCheckingAccess(false);
+    }
+  }
+
+  async function handleStartCheckout() {
+    const cleanEmail = (emailInput || userEmail).trim().toLowerCase();
+
+    if (!cleanEmail) {
+      alert("Escribe tu correo antes de continuar al pago.");
+      return;
+    }
+
+    try {
+      setPaying(true);
+      setUserEmail(cleanEmail);
+      setEmailInput(cleanEmail);
+
+      const response = await fetch(`${BACKEND_URL}/create-checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.checkout_url) {
+        throw new Error(data?.detail || "No se pudo crear la sesión de pago.");
+      }
+
+      window.location.href = data.checkout_url;
+    } catch (error) {
+      console.error("Error creando checkout:", error);
+      alert("No se pudo abrir Stripe. Intenta otra vez.");
+      setPaying(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error cerrando sesión:", error);
+    }
+
+    setHasAccess(false);
+    setCheckingAccess(false);
+    setAccessMessage("Sesión cerrada. Inicia sesión otra vez.");
+    setUserEmail("");
+    setEmailInput("");
+  }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkUser = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        const session = data.session;
+
+        if (!isMounted) return;
+
+        if (!session) {
+          setHasAccess(false);
+          setCheckingAccess(false);
+          setAccessMessage("No hay sesión activa. Inicia sesión primero.");
+          return;
+        }
+
+        const email = session.user.email?.trim().toLowerCase() || "";
+
+        if (!email) {
+          setHasAccess(false);
+          setCheckingAccess(false);
+          setAccessMessage("No pudimos detectar tu correo de sesión.");
+          return;
+        }
+
+        setUserEmail(email);
+        setEmailInput(email);
+        await validateAccess(email);
+      } catch (error) {
+        console.error("Error revisando sesión:", error);
+
+        if (!isMounted) return;
+
+        setHasAccess(false);
+        setCheckingAccess(false);
+        setAccessMessage("No se pudo revisar tu sesión.");
+      }
+    };
+
+    checkUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+
+      if (!session) {
+        setHasAccess(false);
+        setCheckingAccess(false);
+        setAccessMessage("Tu sesión se cerró. Inicia sesión otra vez.");
+        setUserEmail("");
+        setEmailInput("");
+        return;
+      }
+
+      const email = session.user.email?.trim().toLowerCase() || "";
+      setUserEmail(email);
+      setEmailInput(email);
+
+      if (email) {
+        validateAccess(email);
+      } else {
+        setHasAccess(false);
+        setCheckingAccess(false);
+        setAccessMessage("No pudimos detectar tu correo de sesión.");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutStatus = params.get("checkout");
+
+    if (checkoutStatus === "success") {
+      setAccessMessage("Pago detectado. Estamos validando tu acceso.");
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -356,7 +569,6 @@ export default function App() {
     }));
 
     setSeries((prev) => [...prev, ...newSeries]);
-
     setShowRoutineModal(false);
     resetRoutineForm();
   }
@@ -479,8 +691,100 @@ export default function App() {
     });
   }
 
-  return (
+  if (checkingAccess) {
+    return (
+      <div style={pageStyle}>
+        <div style={paywallShellStyle}>
+          <div style={paywallCardStyle}>
+            <div style={paywallBadgeStyle}>VALIDANDO ACCESO</div>
+            <h1 style={paywallTitleStyle}>Control de rutinas</h1>
+            <p style={paywallTextStyle}>
+              Estamos revisando si tu plan mensual está activo.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div style={pageStyle}>
+        <div style={paywallShellStyle}>
+          <div style={paywallCardStyle}>
+            <div style={paywallBadgeStyle}>ACCESO BLOQUEADO</div>
+
+            <h1 style={paywallTitleStyle}>Activa tu plan mensual</h1>
+
+            <p style={paywallTextStyle}>
+              Tu suscripción no está activa. Para usar la app web, activa tu{" "}
+              <strong>{PLAN_NAME}</strong>.
+            </p>
+
+            <div style={paywallPlanBoxStyle}>
+              <div style={paywallPlanLabelStyle}>PLAN</div>
+              <div style={paywallPlanNameStyle}>{PLAN_NAME}</div>
+              <div style={paywallPlanPriceStyle}>5 USD / mes</div>
+            </div>
+
+            <input
+              type="email"
+              placeholder="Escribe tu correo"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              style={paywallInputStyle}
+            />
+
+            {accessMessage ? (
+              <div style={paywallMessageStyle}>{accessMessage}</div>
+            ) : null}
+
+            <div style={paywallButtonsWrapStyle}>
+              <button
+                onClick={() => validateAccess(emailInput)}
+                style={secondaryButtonStyle}
+              >
+                REVISAR ACCESO
+              </button>
+
+              <button
+                onClick={handleStartCheckout}
+                disabled={paying}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: paying ? 0.75 : 1,
+                }}
+              >
+                {paying ? "ABRIENDO PAGO..." : "PAGAR PLAN MENSUAL"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+    return (
     <div style={pageStyle}>
+      <button
+        onClick={handleLogout}
+        style={{
+          position: "fixed",
+          top: 20,
+          right: 20,
+          background: "#ff4d4f",
+          color: "#fff",
+          border: "none",
+          padding: "10px 14px",
+          borderRadius: 10,
+          fontWeight: 800,
+          cursor: "pointer",
+          zIndex: 999,
+          boxShadow: "0 6px 0 #8f1f20",
+        }}
+      >
+        Cerrar sesión
+      </button>
+
       <div style={{ maxWidth: 520, margin: "0 auto" }}>
         <div style={heroStyle}>
           <div>
@@ -555,9 +859,7 @@ export default function App() {
         )}
 
         {currentRoutine && orderedIncomingSeries.length > 0 && (
-          <div style={sectionTitleStyle}>
-            Ejercicios en fila
-          </div>
+          <div style={sectionTitleStyle}>Ejercicios en fila</div>
         )}
 
         {currentRoutine &&
@@ -707,6 +1009,7 @@ export default function App() {
                 <div style={{ color: muted, marginBottom: 14, fontSize: 16, fontWeight: 800 }}>
                   {nextSeries.reps} repeticiones · descanso {nextSeries.restSeconds}s
                 </div>
+
                 <button
                   onClick={() => {
                     setShowCompleted((prev) => !prev);
@@ -726,6 +1029,7 @@ export default function App() {
                 >
                   {showCompleted ? "OCULTAR REALIZADAS" : "VER REALIZADAS"}
                 </button>
+
                 <button
                   onClick={() => {
                     openCreateRoutine();
@@ -798,13 +1102,13 @@ export default function App() {
                       });
                     }}
                     style={{
-  ...primaryButtonStyle,
-  padding: "72px 18px", // 🔥 600% más alto
-  fontSize: 18,
-  borderRadius: 22,
-  background: "linear-gradient(180deg, #ffb347 0%, #ff8c1a 100%)",
-  boxShadow: "0 8px 0 #a55407, 0 18px 24px rgba(0,0,0,0.22)",
-}}
+                      ...primaryButtonStyle,
+                      padding: "72px 18px",
+                      fontSize: 18,
+                      borderRadius: 22,
+                      background: "linear-gradient(180deg, #ffb347 0%, #ff8c1a 100%)",
+                      boxShadow: "0 8px 0 #a55407, 0 18px 24px rgba(0,0,0,0.22)",
+                    }}
                   >
                     EMPEZAR SIGUIENTE EJERCICIO
                   </button>
@@ -853,15 +1157,15 @@ export default function App() {
                       scrollToBottom();
                     }}
                     style={{
-  background: "linear-gradient(180deg, #f2f2f2 0%, #dcdcdc 100%)",
-  color: "#333333",
-  border: "1px solid #cfcfcf",
-  padding: "12px 14px",
-  borderRadius: 16,
-  fontWeight: 900,
-  cursor: "pointer",
-  boxShadow: "0 6px 0 #b5b5b5",
-}}
+                      background: "linear-gradient(180deg, #f2f2f2 0%, #dcdcdc 100%)",
+                      color: "#333333",
+                      border: "1px solid #cfcfcf",
+                      padding: "12px 14px",
+                      borderRadius: 16,
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      boxShadow: "0 6px 0 #b5b5b5",
+                    }}
                   >
                     VOLVER
                   </button>
@@ -1186,6 +1490,111 @@ const pageStyle: React.CSSProperties = {
   fontFamily: "Arial, sans-serif",
   padding: "18px 16px 20px",
   boxSizing: "border-box",
+};
+
+const paywallShellStyle: React.CSSProperties = {
+  minHeight: "calc(100vh - 36px)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  maxWidth: 520,
+  margin: "0 auto",
+};
+
+const paywallCardStyle: React.CSSProperties = {
+  width: "100%",
+  background: "linear-gradient(180deg, #101613 0%, #0d1210 100%)",
+  border: `1px solid ${border}`,
+  borderRadius: 30,
+  padding: 24,
+  boxShadow: "0 18px 40px rgba(0,0,0,0.28)",
+  textAlign: "center",
+};
+
+const paywallBadgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "7px 12px",
+  borderRadius: 999,
+  background: "rgba(183,255,49,0.12)",
+  color: neonSoft,
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: 1.1,
+  marginBottom: 16,
+};
+
+const paywallTitleStyle: React.CSSProperties = {
+  margin: "0 0 10px",
+  color: text,
+  fontSize: 30,
+  fontWeight: 900,
+  lineHeight: 1.05,
+};
+
+const paywallTextStyle: React.CSSProperties = {
+  margin: "0 0 18px",
+  color: muted,
+  fontSize: 15,
+  lineHeight: 1.5,
+};
+
+const paywallPlanBoxStyle: React.CSSProperties = {
+  background: "linear-gradient(180deg, #1e2d21 0%, #172119 100%)",
+  border: "1px solid #2c4b31",
+  borderRadius: 24,
+  padding: 18,
+  marginBottom: 16,
+  boxShadow: "0 14px 0 #0c120d, 0 24px 34px rgba(0,0,0,0.28)",
+};
+
+const paywallPlanLabelStyle: React.CSSProperties = {
+  color: neonSoft,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 1,
+  marginBottom: 8,
+};
+
+const paywallPlanNameStyle: React.CSSProperties = {
+  color: text,
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1.2,
+  marginBottom: 8,
+};
+
+const paywallPlanPriceStyle: React.CSSProperties = {
+  color: neon,
+  fontSize: 26,
+  fontWeight: 1000,
+};
+
+const paywallInputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 14px",
+  marginBottom: 12,
+  borderRadius: 16,
+  border: `1px solid ${border}`,
+  outline: "none",
+  boxSizing: "border-box",
+  background: dark3,
+  fontSize: 14,
+  color: text,
+};
+
+const paywallMessageStyle: React.CSSProperties = {
+  marginBottom: 14,
+  color: "#ffd089",
+  fontSize: 14,
+  fontWeight: 800,
+};
+
+const paywallButtonsWrapStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
 };
 
 const heroStyle: React.CSSProperties = {
