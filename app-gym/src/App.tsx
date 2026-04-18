@@ -29,6 +29,7 @@ type ValidateAccessResponse = {
   plan?: string;
   should_show_paywall?: boolean;
   message?: string;
+  current_period_end?: string;
 };
 
 type ViewMode = "checking" | "login" | "expired" | "app";
@@ -140,6 +141,11 @@ const [emailInput, setEmailInput] = useState("");
 const [passwordInput, setPasswordInput] = useState("");
 const [loginLoading, setLoginLoading] = useState(false);
 const [showMenu, setShowMenu] = useState(false);
+const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+const [subscriptionEndsAt, setSubscriptionEndsAt] = useState("");
+const [subscriptionMessage, setSubscriptionMessage] = useState("");
+const [cancelingSubscription, setCancelingSubscription] = useState(false);
 
   const timerRef = useRef<number | null>(null);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -176,9 +182,10 @@ const [showMenu, setShowMenu] = useState(false);
 
     const active = Boolean(data?.access_active);
 
-    setHasAccess(active);
-    setUserEmail(cleanEmail);
-    setEmailInput(cleanEmail);
+setHasAccess(active);
+setUserEmail(cleanEmail);
+setEmailInput(cleanEmail);
+setSubscriptionEndsAt(data?.current_period_end || "");
 
     if (active) {
       setViewMode("app");
@@ -267,7 +274,63 @@ async function handleLogin() {
     setPaying(false);
   }
 }
+function formatSubscriptionDate(value?: string) {
+  if (!value) return "Fecha no disponible";
 
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
+
+  return date.toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+async function handleCancelSubscription() {
+  const cleanEmail = userEmail.trim().toLowerCase();
+
+  if (!cleanEmail) {
+    setSubscriptionMessage("No pudimos detectar tu correo.");
+    return;
+  }
+
+  try {
+    setCancelingSubscription(true);
+    setSubscriptionMessage("");
+
+    const response = await fetch(`${BACKEND_URL}/cancel-subscription`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: cleanEmail }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
+    }
+
+    setShowCancelConfirmModal(false);
+    setShowSubscriptionModal(true);
+    setSubscriptionMessage(
+     "Tu suscripción fue cancelada. Puedes seguir usando la app hasta que venza tu plan mensual."
+    );
+
+    if (data?.current_period_end) {
+      setSubscriptionEndsAt(data.current_period_end);
+    }
+    await validateAccess(userEmail);
+  } catch (error) {
+    console.error("Error cancelando suscripción:", error);
+    setSubscriptionMessage("No se pudo cancelar la suscripción. Intenta de nuevo.");
+  } finally {
+    setCancelingSubscription(false);
+  }
+}
   async function handleLogout() {
   try {
     await supabase.auth.signOut();
@@ -854,15 +917,36 @@ if (viewMode === "expired") {
       display: "flex",
       flexDirection: "column",
       gap: 8,
+      minWidth: 220,
     }}
   >
+    <button
+      onClick={() => {
+        setShowMenu(false);
+        setShowSubscriptionModal(true);
+        setSubscriptionMessage("");
+      }}
+      style={{
+        background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
+        color: "#0f190b",
+        border: "none",
+        padding: "10px 12px",
+        borderRadius: 8,
+        fontWeight: 800,
+        cursor: "pointer",
+        boxShadow: "0 6px 0 #3f7010",
+      }}
+    >
+      Detalles de suscripción
+    </button>
+
     <button
       onClick={handleLogout}
       style={{
         background: "#ff4d4f",
         color: "#fff",
         border: "none",
-        padding: "10px",
+        padding: "10px 12px",
         borderRadius: 8,
         fontWeight: 800,
         cursor: "pointer",
@@ -1319,7 +1403,107 @@ if (viewMode === "expired") {
           </>
         )}
       </div>
+{showSubscriptionModal && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
+        Plan mensual activo
+      </div>
 
+      <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
+        Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+      </div>
+
+      {subscriptionMessage ? (
+        <div
+          style={{
+            marginBottom: 16,
+            color: neonSoft,
+            fontSize: 14,
+            fontWeight: 800,
+            lineHeight: 1.5,
+          }}
+        >
+          {subscriptionMessage}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          onClick={() => {
+            setShowSubscriptionModal(false);
+            setShowCancelConfirmModal(true);
+          }}
+          style={{
+            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+            color: "#ffffff",
+            border: "none",
+            padding: "12px 14px",
+            borderRadius: 16,
+            fontWeight: 900,
+            cursor: "pointer",
+            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          Cancelar suscripción
+        </button>
+
+        <button
+          onClick={() => {
+            setShowSubscriptionModal(false);
+            setSubscriptionMessage("");
+          }}
+          style={primaryButtonStyle}
+        >
+          Regresar a la app
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{showCancelConfirmModal && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
+        ¡Estás a punto de cancelar tu suscripción!
+      </div>
+
+      <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
+        ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          onClick={handleCancelSubscription}
+          disabled={cancelingSubscription}
+          style={{
+            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+            color: "#ffffff",
+            border: "none",
+            padding: "12px 14px",
+            borderRadius: 16,
+            fontWeight: 900,
+            cursor: "pointer",
+            opacity: cancelingSubscription ? 0.75 : 1,
+            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
+        </button>
+
+        <button
+          onClick={() => {
+            setShowCancelConfirmModal(false);
+            setShowSubscriptionModal(true);
+          }}
+          style={primaryButtonStyle}
+        >
+          Regresar a la app
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {showRoutineModal && (
         <div style={modalOverlayStyle}>
           <div style={modalStyle}>
