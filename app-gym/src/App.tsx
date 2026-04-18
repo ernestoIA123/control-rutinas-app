@@ -35,7 +35,6 @@ type ViewMode = "checking" | "login" | "expired" | "app";
 
 const BACKEND_URL = "https://control-rutinas-backend-production.up.railway.app";
 // 🔥 Ya no forzamos redirección automática al login para evitar el parpadeo
-const PLAN_NAME = "Plan mensual: control de rutinas";
 
 const neon = "#b7ff31";
 const neonSoft = "#eaffb8";
@@ -133,7 +132,7 @@ export default function App() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("checking");
 const [checkingAccess, setCheckingAccess] = useState(true);
-const [hasAccess, setHasAccess] = useState(false);
+const [, setHasAccess] = useState(false);
 const [paying, setPaying] = useState(false);
 const [accessMessage, setAccessMessage] = useState("");
 const [userEmail, setUserEmail] = useState("");
@@ -1631,37 +1630,6 @@ const paywallTextStyle: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-const paywallPlanBoxStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #1e2d21 0%, #172119 100%)",
-  border: "1px solid #2c4b31",
-  borderRadius: 24,
-  padding: 18,
-  marginBottom: 16,
-  boxShadow: "0 14px 0 #0c120d, 0 24px 34px rgba(0,0,0,0.28)",
-};
-
-const paywallPlanLabelStyle: React.CSSProperties = {
-  color: neonSoft,
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: 1,
-  marginBottom: 8,
-};
-
-const paywallPlanNameStyle: React.CSSProperties = {
-  color: text,
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1.2,
-  marginBottom: 8,
-};
-
-const paywallPlanPriceStyle: React.CSSProperties = {
-  color: neon,
-  fontSize: 26,
-  fontWeight: 1000,
-};
-
 const paywallInputStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px 14px",
@@ -1935,17 +1903,6 @@ const primaryButtonStyle: React.CSSProperties = {
   fontWeight: 900,
   cursor: "pointer",
   boxShadow: "0 8px 0 #3f7010, 0 18px 24px rgba(0,0,0,0.22)",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-  color: text,
-  border: `1px solid ${border}`,
-  padding: "12px 14px",
-  borderRadius: 16,
-  fontWeight: 800,
-  cursor: "pointer",
-  boxShadow: "0 6px 0 #090c0a",
 };
 
 const modalOverlayStyle: React.CSSProperties = {
