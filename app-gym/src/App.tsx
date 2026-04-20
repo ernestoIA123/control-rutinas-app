@@ -30,6 +30,7 @@ type ValidateAccessResponse = {
   should_show_paywall?: boolean;
   message?: string;
   current_period_end?: string;
+  device_mismatch?: boolean;
 };
 
 type ViewMode = "checking" | "login" | "expired" | "app";
@@ -53,6 +54,17 @@ const STORAGE_ROUTINES = "gym_routines_v4";
 const STORAGE_SERIES = "gym_series_v4";
 const STORAGE_ACTIVE = "gym_active_routine_v4";
 const STORAGE_REST = "gym_rest_state_v4";
+
+function getDeviceId() {
+  let deviceId = localStorage.getItem("device_id");
+
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("device_id", deviceId);
+  }
+
+  return deviceId;
+}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -166,13 +178,18 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
     setCheckingAccess(true);
     setAccessMessage("");
 
-    const response = await fetch(`${BACKEND_URL}/validate-access`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email: cleanEmail }),
-    });
+    const deviceId = getDeviceId();
+
+const response = await fetch(`${BACKEND_URL}/validate-access`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    email: cleanEmail,
+    device_id: deviceId,
+  }),
+});
 
     const data: ValidateAccessResponse = await response.json();
 
@@ -181,6 +198,15 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
     }
 
     const active = Boolean(data?.access_active);
+// 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
+if (data?.device_mismatch) {
+  setHasAccess(false);
+  setViewMode("login");
+  setAccessMessage("Tu cuenta se abrió en otro dispositivo.");
+  
+  await supabase.auth.signOut();
+  return false;
+}
 
 setHasAccess(active);
 setUserEmail(cleanEmail);
@@ -422,12 +448,19 @@ async function handleCancelSubscription() {
     setEmailInput(email);
     await validateAccess(email);
   });
+// 🔁 Revalidar acceso cada 15 segundos
+const interval = setInterval(() => {
+  if (userEmail) {
+    validateAccess(userEmail);
+  }
+}, 15000);
 
   return () => {
-    isMounted = false;
-    subscription.unsubscribe();
-  };
-}, []);
+  isMounted = false;
+  subscription.unsubscribe();
+  clearInterval(interval);
+};
+}, [userEmail]);
 
   useEffect(() => {
   const params = new URLSearchParams(window.location.search);
