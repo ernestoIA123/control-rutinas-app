@@ -448,12 +448,12 @@ async function handleCancelSubscription() {
     setEmailInput(email);
     await validateAccess(email);
   });
-// 🔁 Revalidar acceso cada 15 segundos
+// 🔁 Revalidar acceso cada 24 horas
 const interval = setInterval(() => {
   if (userEmail) {
     validateAccess(userEmail);
   }
-}, 15000);
+}, 86400000 );
 
   return () => {
   isMounted = false;
