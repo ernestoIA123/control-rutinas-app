@@ -144,295 +144,251 @@ export default function App() {
   const [showCompleted, setShowCompleted] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>("checking");
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const [, setHasAccess] = useState(false);
-  const [paying, setPaying] = useState(false);
-  const [accessMessage, setAccessMessage] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [emailInput, setEmailInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
-  const [subscriptionEndsAt, setSubscriptionEndsAt] = useState("");
-  const [subscriptionMessage, setSubscriptionMessage] = useState("");
-  const [subscriptionCanceled, setSubscriptionCanceled] = useState(false);
-  const [cancelingSubscription, setCancelingSubscription] = useState(false);
+const [checkingAccess, setCheckingAccess] = useState(true);
+const [, setHasAccess] = useState(false);
+const [paying, setPaying] = useState(false);
+const [accessMessage, setAccessMessage] = useState("");
+const [userEmail, setUserEmail] = useState("");
+const [emailInput, setEmailInput] = useState("");
+const [passwordInput, setPasswordInput] = useState("");
+const [loginLoading, setLoginLoading] = useState(false);
+const [showMenu, setShowMenu] = useState(false);
+const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+const [subscriptionEndsAt, setSubscriptionEndsAt] = useState("");
+const [subscriptionMessage, setSubscriptionMessage] = useState("");
+const [cancelingSubscription, setCancelingSubscription] = useState(false);
 
   const timerRef = useRef<number | null>(null);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  async function validateAccess(emailToCheck?: string) {
-    const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
+ async function validateAccess(emailToCheck?: string) {
+  const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
 
-    if (!cleanEmail) {
-      setHasAccess(false);
-      setCheckingAccess(false);
-      setViewMode("login");
-      setAccessMessage("Ingresa tu correo y contraseña para continuar.");
-      return false;
-    }
-
-    try {
-      setCheckingAccess(true);
-      setAccessMessage("");
-
-      const deviceId = getDeviceId();
-
-      const response = await fetch(`${BACKEND_URL}/validate-access`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: cleanEmail,
-          device_id: deviceId,
-        }),
-      });
-
-      const data: ValidateAccessResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message || "No se pudo validar el acceso.");
-      }
-
-      const active = Boolean(data?.access_active);
-      // 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
-      if (data?.device_mismatch) {
-        setHasAccess(false);
-        setViewMode("login");
-        setAccessMessage("Tu cuenta se abrió en otro dispositivo.");
-
-        await supabase.auth.signOut();
-        return false;
-      }
-
-      setHasAccess(active);
-      setUserEmail(cleanEmail);
-      setEmailInput(cleanEmail);
-      setSubscriptionEndsAt(data?.current_period_end || "");
-
-      if (active) {
-        setViewMode("app");
-        setAccessMessage("");
-        return true;
-      }
-
-      setViewMode("expired");
-      setAccessMessage(
-        data?.message || "Tu plan expiró. Vuelve a suscribirte para recuperar el acceso."
-      );
-      return false;
-    } catch (error) {
-      console.error("Error validando acceso:", error);
-      setHasAccess(false);
-      setViewMode("login");
-      setAccessMessage("No se pudo validar tu acceso. Intenta de nuevo.");
-      return false;
-    } finally {
-      setCheckingAccess(false);
-    }
-  }
-  async function handleLogin() {
-    const cleanEmail = emailInput.trim().toLowerCase();
-    const cleanPassword = passwordInput.trim();
-
-    if (!cleanEmail || !cleanPassword) {
-      setAccessMessage("Escribe tu correo y contraseña.");
-      return;
-    }
-
-    try {
-      setLoginLoading(true);
-      setAccessMessage("");
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPassword,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      setUserEmail(cleanEmail);
-      await validateAccess(cleanEmail);
-    } catch (error) {
-      console.error("Error iniciando sesión:", error);
-      setHasAccess(false);
-      setViewMode("login");
-      setAccessMessage("Correo o contraseña incorrectos.");
-    } finally {
-      setLoginLoading(false);
-    }
-  }
-  async function handleStartCheckout() {
-    const cleanEmail = (userEmail || emailInput).trim().toLowerCase();
-
-    if (!cleanEmail) {
-      setAccessMessage("Primero inicia sesión con tu correo.");
-      return;
-    }
-
-    try {
-      setPaying(true);
-
-      const response = await fetch(`${BACKEND_URL}/create-checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: cleanEmail }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.checkout_url) {
-        throw new Error(data?.detail || "No se pudo crear la sesión de pago.");
-      }
-
-      window.location.href = data.checkout_url;
-    } catch (error) {
-      console.error("Error creando checkout:", error);
-      setAccessMessage("No se pudo abrir el pago. Intenta de nuevo.");
-    } finally {
-      setPaying(false);
-    }
-  }
-  function formatSubscriptionDate(value?: string) {
-    if (!value) return "Fecha no disponible";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) return "Fecha no disponible";
-
-    return date.toLocaleDateString("es-MX", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
-
-  async function handleCancelSubscription() {
-    const cleanEmail = userEmail.trim().toLowerCase();
-
-    if (!cleanEmail) {
-      setSubscriptionMessage("No pudimos detectar tu correo.");
-      return;
-    }
-
-    try {
-      setCancelingSubscription(true);
-      setSubscriptionMessage("");
-
-      const response = await fetch(`${BACKEND_URL}/cancel-subscription`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: cleanEmail }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
-      }
-
-      setShowCancelConfirmModal(false);
-      setShowSubscriptionModal(true);
-      setSubscriptionCanceled(true);
-      setSubscriptionMessage(
-        "Tu suscripción ya fue cancelada. No se te volverá a cobrar. Puedes seguir usando la app hasta que termine tu periodo pagado."
-      );
-
-      if (data?.current_period_end) {
-        setSubscriptionEndsAt(data.current_period_end);
-      }
-      await validateAccess(userEmail);
-    } catch (error) {
-      console.error("Error cancelando suscripción:", error);
-      setSubscriptionMessage("No se pudo cancelar la suscripción. Intenta de nuevo.");
-    } finally {
-      setCancelingSubscription(false);
-    }
-  }
-  async function handleLogout() {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error("Error cerrando sesión:", error);
-    }
-
+  if (!cleanEmail) {
     setHasAccess(false);
     setCheckingAccess(false);
     setViewMode("login");
-    setAccessMessage("Sesión cerrada.");
-    setUserEmail("");
-    setEmailInput("");
-    setPasswordInput("");
+    setAccessMessage("Ingresa tu correo y contraseña para continuar.");
+    return false;
   }
+
+  try {
+    setCheckingAccess(true);
+    setAccessMessage("");
+
+    const deviceId = getDeviceId();
+
+const response = await fetch(`${BACKEND_URL}/validate-access`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    email: cleanEmail,
+    device_id: deviceId,
+  }),
+});
+
+    const data: ValidateAccessResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || "No se pudo validar el acceso.");
+    }
+
+    const active = Boolean(data?.access_active);
+// 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
+if (data?.device_mismatch) {
+  setHasAccess(false);
+  setViewMode("login");
+  setAccessMessage("Tu cuenta se abrió en otro dispositivo.");
+  
+  await supabase.auth.signOut();
+  return false;
+}
+
+setHasAccess(active);
+setUserEmail(cleanEmail);
+setEmailInput(cleanEmail);
+setSubscriptionEndsAt(data?.current_period_end || "");
+
+    if (active) {
+      setViewMode("app");
+      setAccessMessage("");
+      return true;
+    }
+
+    setViewMode("expired");
+    setAccessMessage(
+      data?.message || "Tu plan expiró. Vuelve a suscribirte para recuperar el acceso."
+    );
+    return false;
+  } catch (error) {
+    console.error("Error validando acceso:", error);
+    setHasAccess(false);
+    setViewMode("login");
+    setAccessMessage("No se pudo validar tu acceso. Intenta de nuevo.");
+    return false;
+  } finally {
+    setCheckingAccess(false);
+  }
+}
+async function handleLogin() {
+  const cleanEmail = emailInput.trim().toLowerCase();
+  const cleanPassword = passwordInput.trim();
+
+  if (!cleanEmail || !cleanPassword) {
+    setAccessMessage("Escribe tu correo y contraseña.");
+    return;
+  }
+
+  try {
+    setLoginLoading(true);
+    setAccessMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: cleanPassword,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    setUserEmail(cleanEmail);
+    await validateAccess(cleanEmail);
+  } catch (error) {
+    console.error("Error iniciando sesión:", error);
+    setHasAccess(false);
+    setViewMode("login");
+    setAccessMessage("Correo o contraseña incorrectos.");
+  } finally {
+    setLoginLoading(false);
+  }
+}
+  async function handleStartCheckout() {
+  const cleanEmail = (userEmail || emailInput).trim().toLowerCase();
+
+  if (!cleanEmail) {
+    setAccessMessage("Primero inicia sesión con tu correo.");
+    return;
+  }
+
+  try {
+    setPaying(true);
+
+    const response = await fetch(`${BACKEND_URL}/create-checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: cleanEmail }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data?.checkout_url) {
+      throw new Error(data?.detail || "No se pudo crear la sesión de pago.");
+    }
+
+    window.location.href = data.checkout_url;
+  } catch (error) {
+    console.error("Error creando checkout:", error);
+    setAccessMessage("No se pudo abrir el pago. Intenta de nuevo.");
+  } finally {
+    setPaying(false);
+  }
+}
+function formatSubscriptionDate(value?: string) {
+  if (!value) return "Fecha no disponible";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
+
+  return date.toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+async function handleCancelSubscription() {
+  const cleanEmail = userEmail.trim().toLowerCase();
+
+  if (!cleanEmail) {
+    setSubscriptionMessage("No pudimos detectar tu correo.");
+    return;
+  }
+
+  try {
+    setCancelingSubscription(true);
+    setSubscriptionMessage("");
+
+    const response = await fetch(`${BACKEND_URL}/cancel-subscription`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: cleanEmail }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
+    }
+
+    setShowCancelConfirmModal(false);
+    setShowSubscriptionModal(true);
+    setSubscriptionMessage(
+     "Tu suscripción fue cancelada. Puedes seguir usando la app hasta que venza tu plan mensual."
+    );
+
+    if (data?.current_period_end) {
+      setSubscriptionEndsAt(data.current_period_end);
+    }
+    await validateAccess(userEmail);
+  } catch (error) {
+    console.error("Error cancelando suscripción:", error);
+    setSubscriptionMessage("No se pudo cancelar la suscripción. Intenta de nuevo.");
+  } finally {
+    setCancelingSubscription(false);
+  }
+}
+  async function handleLogout() {
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error("Error cerrando sesión:", error);
+  }
+
+  setHasAccess(false);
+  setCheckingAccess(false);
+  setViewMode("login");
+  setAccessMessage("Sesión cerrada.");
+  setUserEmail("");
+  setEmailInput("");
+  setPasswordInput("");
+}
   useEffect(() => {
-    let isMounted = true;
+  let isMounted = true;
 
-    const checkUser = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
+  const checkUser = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
 
-        if (error) throw error;
-        if (!isMounted) return;
-
-        const session = data.session;
-
-        if (!session) {
-          setHasAccess(false);
-          setCheckingAccess(false);
-          setViewMode("login");
-          setAccessMessage("");
-          return;
-        }
-
-        const email = session.user.email?.trim().toLowerCase() || "";
-
-        if (!email) {
-          setHasAccess(false);
-          setCheckingAccess(false);
-          setViewMode("login");
-          setAccessMessage("No pudimos detectar tu correo.");
-          return;
-        }
-
-        setUserEmail(email);
-        setEmailInput(email);
-        await validateAccess(email);
-      } catch (error) {
-        console.error("Error revisando sesión:", error);
-
-        if (!isMounted) return;
-
-        setHasAccess(false);
-        setCheckingAccess(false);
-        setViewMode("login");
-        setAccessMessage("No se pudo revisar tu sesión.");
-      }
-    };
-
-    checkUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (error) throw error;
       if (!isMounted) return;
+
+      const session = data.session;
 
       if (!session) {
         setHasAccess(false);
         setCheckingAccess(false);
         setViewMode("login");
-        setUserEmail("");
-        setEmailInput("");
-        setPasswordInput("");
+        setAccessMessage("");
         return;
       }
 
@@ -449,30 +405,72 @@ export default function App() {
       setUserEmail(email);
       setEmailInput(email);
       await validateAccess(email);
-    });
-    // 🔁 Revalidar acceso cada 24 horas
-    const interval = setInterval(() => {
-      if (userEmail) {
-        validateAccess(userEmail);
-      }
-    }, 86400000);
+    } catch (error) {
+      console.error("Error revisando sesión:", error);
 
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-      clearInterval(interval);
-    };
-  }, [userEmail]);
+      if (!isMounted) return;
+
+      setHasAccess(false);
+      setCheckingAccess(false);
+      setViewMode("login");
+      setAccessMessage("No se pudo revisar tu sesión.");
+    }
+  };
+
+  checkUser();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!isMounted) return;
+
+    if (!session) {
+      setHasAccess(false);
+      setCheckingAccess(false);
+      setViewMode("login");
+      setUserEmail("");
+      setEmailInput("");
+      setPasswordInput("");
+      return;
+    }
+
+    const email = session.user.email?.trim().toLowerCase() || "";
+
+    if (!email) {
+      setHasAccess(false);
+      setCheckingAccess(false);
+      setViewMode("login");
+      setAccessMessage("No pudimos detectar tu correo.");
+      return;
+    }
+
+    setUserEmail(email);
+    setEmailInput(email);
+    await validateAccess(email);
+  });
+// 🔁 Revalidar acceso cada 24 horas
+const interval = setInterval(() => {
+  if (userEmail) {
+    validateAccess(userEmail);
+  }
+}, 86400000 );
+
+  return () => {
+  isMounted = false;
+  subscription.unsubscribe();
+  clearInterval(interval);
+};
+}, [userEmail]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkoutStatus = params.get("checkout");
+  const params = new URLSearchParams(window.location.search);
+  const checkoutStatus = params.get("checkout");
 
-    if (checkoutStatus === "success" && userEmail) {
-      setAccessMessage("Pago detectado. Estamos validando tu acceso.");
-      validateAccess(userEmail);
-    }
-  }, [userEmail]);
+  if (checkoutStatus === "success" && userEmail) {
+    setAccessMessage("Pago detectado. Estamos validando tu acceso.");
+    validateAccess(userEmail);
+  }
+}, [userEmail]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_ROUTINES, JSON.stringify(routines));
@@ -811,188 +809,188 @@ export default function App() {
   }
 
   if (checkingAccess || viewMode === "checking") {
-    return (
-      <div style={pageStyle}>
-        <div style={paywallShellStyle}>
-          <div style={paywallCardStyle}>
-            <div style={paywallBadgeStyle}>VALIDANDO ACCESO</div>
-            <h1 style={paywallTitleStyle}>Control de rutinas</h1>
-            <p style={paywallTextStyle}>
-              Estamos verificando tu sesión y tu suscripción.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (viewMode === "login") {
-    return (
-      <div style={pageStyle}>
-        <div style={paywallShellStyle}>
-          <div style={paywallCardStyle}>
-            <div style={paywallBadgeStyle}>ACCESO</div>
-
-            <h1 style={paywallTitleStyle}>Accede con tu correo</h1>
-
-            <p style={paywallTextStyle}>
-              Ingresa tus datos para verificar si tu acceso sigue activo.
-            </p>
-
-            <input
-              type="email"
-              placeholder="Correo electrónico"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              style={paywallInputStyle}
-            />
-
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              style={paywallInputStyle}
-            />
-
-            {accessMessage ? (
-              <div style={paywallMessageStyle}>{accessMessage}</div>
-            ) : null}
-
-            <div style={paywallButtonsWrapStyle}>
-              <button
-                onClick={handleLogin}
-                disabled={loginLoading}
-                style={{
-                  ...primaryButtonStyle,
-                  opacity: loginLoading ? 0.75 : 1,
-                }}
-              >
-                {loginLoading ? "ACCEDIENDO..." : "ACCEDER"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (viewMode === "expired") {
-    return (
-      <div style={pageStyle}>
-        <div style={paywallShellStyle}>
-          <div style={paywallCardStyle}>
-            <div style={paywallBadgeStyle}>PLAN EXPIRADO</div>
-
-            <h1 style={paywallTitleStyle}>Tu plan expiró</h1>
-
-            <p style={paywallTextStyle}>
-              No pierdas tus rutinas. Suscríbete de nuevo por tan solo{" "}
-              <strong>99 pesos mexicanos</strong>.
-            </p>
-
-            {accessMessage ? (
-              <div style={paywallMessageStyle}>{accessMessage}</div>
-            ) : null}
-
-            <div style={paywallButtonsWrapStyle}>
-              <button
-                onClick={handleStartCheckout}
-                disabled={paying}
-                style={{
-                  ...primaryButtonStyle,
-                  opacity: paying ? 0.75 : 1,
-                }}
-              >
-                {paying ? "ABRIENDO PAGO..." : "VOLVERME A SUSCRIBIR"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
   return (
     <div style={pageStyle}>
-      <div
-        style={{
-          position: "fixed",
-          top: 20,
-          right: 20,
-          zIndex: 999,
-          display: "flex",
-          gap: 8,
-        }}
-      >
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          style={{
-            background: "#1a211d",
-            color: "#fff",
-            border: `1px solid ${border}`,
-            padding: "10px 12px",
-            borderRadius: 12,
-            fontWeight: 900,
-            cursor: "pointer",
-            boxShadow: "0 6px 0 #090c0a",
-          }}
-        >
-          ⚙️
-        </button>
-        {showMenu && (
-          <div
-            style={{
-              position: "absolute",
-              top: 50,
-              right: 0,
-              background: "#121916",
-              border: `1px solid ${border}`,
-              borderRadius: 12,
-              padding: 10,
-              boxShadow: "0 10px 20px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              minWidth: 220,
-            }}
-          >
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                setShowSubscriptionModal(true);
-                setSubscriptionMessage("");
-              }}
-              style={{
-                background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
-                color: "#0f190b",
-                border: "none",
-                padding: "10px 12px",
-                borderRadius: 8,
-                fontWeight: 800,
-                cursor: "pointer",
-                boxShadow: "0 6px 0 #3f7010",
-              }}
-            >
-              Detalles de suscripción
-            </button>
+      <div style={paywallShellStyle}>
+        <div style={paywallCardStyle}>
+          <div style={paywallBadgeStyle}>VALIDANDO ACCESO</div>
+          <h1 style={paywallTitleStyle}>Control de rutinas</h1>
+          <p style={paywallTextStyle}>
+            Estamos verificando tu sesión y tu suscripción.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+  if (viewMode === "login") {
+  return (
+    <div style={pageStyle}>
+      <div style={paywallShellStyle}>
+        <div style={paywallCardStyle}>
+          <div style={paywallBadgeStyle}>ACCESO</div>
 
+          <h1 style={paywallTitleStyle}>Accede con tu correo</h1>
+
+          <p style={paywallTextStyle}>
+            Ingresa tus datos para verificar si tu acceso sigue activo.
+          </p>
+
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            style={paywallInputStyle}
+          />
+
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            style={paywallInputStyle}
+          />
+
+          {accessMessage ? (
+            <div style={paywallMessageStyle}>{accessMessage}</div>
+          ) : null}
+
+          <div style={paywallButtonsWrapStyle}>
             <button
-              onClick={handleLogout}
+              onClick={handleLogin}
+              disabled={loginLoading}
               style={{
-                background: "#ff4d4f",
-                color: "#fff",
-                border: "none",
-                padding: "10px 12px",
-                borderRadius: 8,
-                fontWeight: 800,
-                cursor: "pointer",
+                ...primaryButtonStyle,
+                opacity: loginLoading ? 0.75 : 1,
               }}
             >
-              Cerrar sesión
+              {loginLoading ? "ACCEDIENDO..." : "ACCEDER"}
             </button>
           </div>
-        )}
-
+        </div>
       </div>
+    </div>
+  );
+}
+
+if (viewMode === "expired") {
+  return (
+    <div style={pageStyle}>
+      <div style={paywallShellStyle}>
+        <div style={paywallCardStyle}>
+          <div style={paywallBadgeStyle}>PLAN EXPIRADO</div>
+
+          <h1 style={paywallTitleStyle}>Tu plan expiró</h1>
+
+          <p style={paywallTextStyle}>
+            No pierdas tus rutinas. Suscríbete de nuevo por tan solo{" "}
+            <strong>99 pesos mexicanos</strong>.
+          </p>
+
+          {accessMessage ? (
+            <div style={paywallMessageStyle}>{accessMessage}</div>
+          ) : null}
+
+          <div style={paywallButtonsWrapStyle}>
+            <button
+              onClick={handleStartCheckout}
+              disabled={paying}
+              style={{
+                ...primaryButtonStyle,
+                opacity: paying ? 0.75 : 1,
+              }}
+            >
+              {paying ? "ABRIENDO PAGO..." : "VOLVERME A SUSCRIBIR"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+    return (
+    <div style={pageStyle}>
+      <div
+  style={{
+    position: "fixed",
+    top: 20,
+    right: 20,
+    zIndex: 999,
+    display: "flex",
+    gap: 8,
+  }}
+>
+  <button
+    onClick={() => setShowMenu(!showMenu)}
+    style={{
+      background: "#1a211d",
+      color: "#fff",
+      border: `1px solid ${border}`,
+      padding: "10px 12px",
+      borderRadius: 12,
+      fontWeight: 900,
+      cursor: "pointer",
+      boxShadow: "0 6px 0 #090c0a",
+    }}
+  >
+    ⚙️
+  </button>
+{showMenu && (
+  <div
+    style={{
+      position: "absolute",
+      top: 50,
+      right: 0,
+      background: "#121916",
+      border: `1px solid ${border}`,
+      borderRadius: 12,
+      padding: 10,
+      boxShadow: "0 10px 20px rgba(0,0,0,0.3)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      minWidth: 220,
+    }}
+  >
+    <button
+      onClick={() => {
+        setShowMenu(false);
+        setShowSubscriptionModal(true);
+        setSubscriptionMessage("");
+      }}
+      style={{
+        background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
+        color: "#0f190b",
+        border: "none",
+        padding: "10px 12px",
+        borderRadius: 8,
+        fontWeight: 800,
+        cursor: "pointer",
+        boxShadow: "0 6px 0 #3f7010",
+      }}
+    >
+      Detalles de suscripción
+    </button>
+
+    <button
+      onClick={handleLogout}
+      style={{
+        background: "#ff4d4f",
+        color: "#fff",
+        border: "none",
+        padding: "10px 12px",
+        borderRadius: 8,
+        fontWeight: 800,
+        cursor: "pointer",
+      }}
+    >
+      Cerrar sesión
+    </button>
+  </div>
+)}
+
+</div>
 
       <div style={{ maxWidth: 520, margin: "0 auto" }}>
         <div style={heroStyle}>
@@ -1140,10 +1138,10 @@ export default function App() {
                     {isAbsorbing
                       ? "ABSORBIENDO..."
                       : isWaiting
-                        ? "SIGUE DESPUÉS DEL DESCANSO"
-                        : isCurrent
-                          ? "SIGUIENTE EN ENTRAR"
-                          : "EN RUTINA ACTIVA"}
+                      ? "SIGUE DESPUÉS DEL DESCANSO"
+                      : isCurrent
+                      ? "SIGUIENTE EN ENTRAR"
+                      : "EN RUTINA ACTIVA"}
                   </div>
                 </div>
               );
@@ -1438,114 +1436,107 @@ export default function App() {
           </>
         )}
       </div>
-      {showSubscriptionModal && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-              {subscriptionCanceled
-                ? "Tu plan fue cancelado exitosamente"
-                : "Plan mensual activo"}
-            </div>
+{showSubscriptionModal && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
+        Plan mensual activo
+      </div>
 
-            <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
-              {subscriptionCanceled
-                ? `Acceso disponible hasta: ${formatSubscriptionDate(subscriptionEndsAt)}`
-                : `Vence: ${formatSubscriptionDate(subscriptionEndsAt)}`}
-            </div>
+      <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
+        Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+      </div>
 
-            <div
-              style={{
-                marginBottom: 16,
-                color: subscriptionCanceled ? neonSoft : muted,
-                fontSize: 14,
-                fontWeight: 800,
-                lineHeight: 1.5,
-              }}
-            >
-              {subscriptionCanceled
-                ? subscriptionMessage ||
-                  "Tu suscripción ya fue cancelada. No se te volverá a cobrar. Puedes seguir usando la app hasta que termine tu periodo pagado."
-                : "Tu suscripción está activa. Puedes seguir usando la aplicación normalmente."}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {!subscriptionCanceled && (
-                <button
-                  onClick={() => {
-                    setShowSubscriptionModal(false);
-                    setShowCancelConfirmModal(true);
-                  }}
-                  style={{
-                    background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 14px",
-                    borderRadius: 16,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                    boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  Cancelar suscripción
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  setShowSubscriptionModal(false);
-                  setSubscriptionMessage("");
-                }}
-                style={primaryButtonStyle}
-              >
-                Regresar a la app
-              </button>
-            </div>
-          </div>
+      {subscriptionMessage ? (
+        <div
+          style={{
+            marginBottom: 16,
+            color: neonSoft,
+            fontSize: 14,
+            fontWeight: 800,
+            lineHeight: 1.5,
+          }}
+        >
+          {subscriptionMessage}
         </div>
-      )}
-      {showCancelConfirmModal && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
-              ¡Estás a punto de cancelar tu suscripción!
-            </div>
+      ) : null}
 
-            <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
-              ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
-            </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          onClick={() => {
+            setShowSubscriptionModal(false);
+            setShowCancelConfirmModal(true);
+          }}
+          style={{
+            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+            color: "#ffffff",
+            border: "none",
+            padding: "12px 14px",
+            borderRadius: 16,
+            fontWeight: 900,
+            cursor: "pointer",
+            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          Cancelar suscripción
+        </button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button
-                onClick={handleCancelSubscription}
-                disabled={cancelingSubscription}
-                style={{
-                  background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "12px 14px",
-                  borderRadius: 16,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  opacity: cancelingSubscription ? 0.75 : 1,
-                  boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                }}
-              >
-                {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
-              </button>
+        <button
+          onClick={() => {
+            setShowSubscriptionModal(false);
+            setSubscriptionMessage("");
+          }}
+          style={primaryButtonStyle}
+        >
+          Regresar a la app
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{showCancelConfirmModal && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
+        ¡Estás a punto de cancelar tu suscripción!
+      </div>
 
-              <button
-                onClick={() => {
-                  setShowCancelConfirmModal(false);
-                  setShowSubscriptionModal(true);
-                }}
-                style={primaryButtonStyle}
-              >
-                Regresar a la app
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
+        ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          onClick={handleCancelSubscription}
+          disabled={cancelingSubscription}
+          style={{
+            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+            color: "#ffffff",
+            border: "none",
+            padding: "12px 14px",
+            borderRadius: 16,
+            fontWeight: 900,
+            cursor: "pointer",
+            opacity: cancelingSubscription ? 0.75 : 1,
+            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
+        </button>
+
+        <button
+          onClick={() => {
+            setShowCancelConfirmModal(false);
+            setShowSubscriptionModal(true);
+          }}
+          style={primaryButtonStyle}
+        >
+          Regresar a la app
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {showRoutineModal && (
         <div style={modalOverlayStyle}>
           <div style={modalStyle}>
