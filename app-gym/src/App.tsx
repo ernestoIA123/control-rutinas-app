@@ -163,7 +163,7 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
- async function validateAccess(emailToCheck?: string) {
+ async function validateAccess(emailToCheck?: string, claimDevice = false) {
   const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
 
   if (!cleanEmail) {
@@ -188,6 +188,7 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
   body: JSON.stringify({
     email: cleanEmail,
     device_id: deviceId,
+    claim_device: claimDevice,
   }),
 });
 
@@ -257,7 +258,7 @@ async function handleLogin() {
     }
 
     setUserEmail(cleanEmail);
-    await validateAccess(cleanEmail);
+    await validateAccess(cleanEmail, true);
   } catch (error) {
     console.error("Error iniciando sesión:", error);
     setHasAccess(false);
@@ -404,7 +405,7 @@ async function handleCancelSubscription() {
 
       setUserEmail(email);
       setEmailInput(email);
-      await validateAccess(email);
+      await validateAccess(email, true);
     } catch (error) {
       console.error("Error revisando sesión:", error);
 
@@ -446,14 +447,14 @@ async function handleCancelSubscription() {
 
     setUserEmail(email);
     setEmailInput(email);
-    await validateAccess(email);
+    await validateAccess(email, true);
   });
 // 🔁 Revalidar acceso cada 24 horas
 const interval = setInterval(() => {
   if (userEmail) {
-    validateAccess(userEmail);
+    validateAccess(userEmail, false);
   }
-}, 86400000 );
+}, 15000 );
 
   return () => {
   isMounted = false;
