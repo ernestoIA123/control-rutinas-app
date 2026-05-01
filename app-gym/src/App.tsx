@@ -1440,11 +1440,16 @@ if (viewMode === "expired") {
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
       <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-        Plan mensual activo
+        {subscriptionMessage 
+          ? "Suscripción cancelada" 
+          : "Plan mensual activo"}
       </div>
 
       <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
-        Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+        {subscriptionMessage 
+          ? "Tu acceso termina: " 
+          : "Vence: "}
+        {formatSubscriptionDate(subscriptionEndsAt)}
       </div>
 
       {subscriptionMessage ? (
@@ -1462,24 +1467,26 @@ if (viewMode === "expired") {
       ) : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <button
-          onClick={() => {
-            setShowSubscriptionModal(false);
-            setShowCancelConfirmModal(true);
-          }}
-          style={{
-            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-            color: "#ffffff",
-            border: "none",
-            padding: "12px 14px",
-            borderRadius: 16,
-            fontWeight: 900,
-            cursor: "pointer",
-            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-          }}
-        >
-          Cancelar suscripción
-        </button>
+        {!subscriptionMessage && (
+          <button
+            onClick={() => {
+              setShowSubscriptionModal(false);
+              setShowCancelConfirmModal(true);
+            }}
+            style={{
+              background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+              color: "#ffffff",
+              border: "none",
+              padding: "12px 14px",
+              borderRadius: 16,
+              fontWeight: 900,
+              cursor: "pointer",
+              boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+            }}
+          >
+            Cancelar suscripción
+          </button>
+        )}
 
         <button
           onClick={() => {
