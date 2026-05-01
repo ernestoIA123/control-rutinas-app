@@ -163,7 +163,7 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
- async function validateAccess(emailToCheck?: string, claimDevice = false) {
+ async function validateAccess(emailToCheck?: string, claimDevice = false, silent = false) {
   const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
 
   if (!cleanEmail) {
@@ -175,8 +175,10 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   }
 
   try {
-    setCheckingAccess(true);
-    setAccessMessage("");
+    if (!silent) {
+      setCheckingAccess(true);
+      setAccessMessage("");
+    }
 
     const deviceId = getDeviceId();
 
@@ -232,7 +234,9 @@ setSubscriptionEndsAt(data?.current_period_end || "");
     setAccessMessage("No se pudo validar tu acceso. Intenta de nuevo.");
     return false;
   } finally {
-    setCheckingAccess(false);
+    if (!silent) {
+      setCheckingAccess(false);
+    }
   }
 }
 async function handleLogin() {
@@ -456,7 +460,7 @@ async function handleCancelSubscription() {
 // 🔁 Revalidar acceso cada 24 horas
 const interval = setInterval(() => {
   if (userEmail) {
-    validateAccess(userEmail, false);
+    validateAccess(userEmail, false, true);
   }
 }, 15000 );
 
