@@ -148,6 +148,7 @@ const [checkingAccess, setCheckingAccess] = useState(true);
 const [, setHasAccess] = useState(false);
 const [paying, setPaying] = useState(false);
 const [accessMessage, setAccessMessage] = useState("");
+const [subscriptionCanceled, setSubscriptionCanceled] = useState(false);
 const [userEmail, setUserEmail] = useState("");
 const [emailInput, setEmailInput] = useState("");
 const [passwordInput, setPasswordInput] = useState("");
@@ -349,6 +350,7 @@ async function handleCancelSubscription() {
       throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
     }
 
+    setSubscriptionCanceled(true);
     setShowCancelConfirmModal(false);
     setShowSubscriptionModal(true);
     setSubscriptionMessage(
@@ -1471,24 +1473,28 @@ if (viewMode === "expired") {
       ) : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <button
-          onClick={() => {
-            setShowSubscriptionModal(false);
-            setShowCancelConfirmModal(true);
-          }}
-          style={{
-            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-            color: "#ffffff",
-            border: "none",
-            padding: "12px 14px",
-            borderRadius: 16,
-            fontWeight: 900,
-            cursor: "pointer",
-            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-          }}
-        >
-          Cancelar suscripción
-        </button>
+
+        {/* 👇 SOLO aparece si NO está cancelado */}
+        {!subscriptionCanceled && (
+          <button
+            onClick={() => {
+              setShowSubscriptionModal(false);
+              setShowCancelConfirmModal(true);
+            }}
+            style={{
+              background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+              color: "#ffffff",
+              border: "none",
+              padding: "12px 14px",
+              borderRadius: 16,
+              fontWeight: 900,
+              cursor: "pointer",
+              boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+            }}
+          >
+            Cancelar suscripción
+          </button>
+        )}
 
         <button
           onClick={() => {
@@ -1497,8 +1503,9 @@ if (viewMode === "expired") {
           }}
           style={primaryButtonStyle}
         >
-          Regresar a la app
+          {subscriptionCanceled ? "Entendido" : "Regresar a la app"}
         </button>
+
       </div>
     </div>
   </div>
