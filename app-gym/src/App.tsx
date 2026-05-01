@@ -244,6 +244,10 @@ async function handleLogin() {
     return;
   }
 
+  setViewMode("checking");
+  setCheckingAccess(true);
+  setAccessMessage("Validando tu acceso...");
+
   try {
     setLoginLoading(true);
     setAccessMessage("");
@@ -1441,7 +1445,7 @@ if (viewMode === "expired") {
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
       <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-        Plan mensual activo
+        {subscriptionMessage ? "Tu plan ha sido cancelado" : "Plan mensual activo"}
       </div>
 
       <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
