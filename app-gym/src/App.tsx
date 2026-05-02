@@ -148,7 +148,6 @@ const [checkingAccess, setCheckingAccess] = useState(true);
 const [, setHasAccess] = useState(false);
 const [paying, setPaying] = useState(false);
 const [accessMessage, setAccessMessage] = useState("");
-const [subscriptionCanceled, setSubscriptionCanceled] = useState(false);
 const [userEmail, setUserEmail] = useState("");
 const [emailInput, setEmailInput] = useState("");
 const [passwordInput, setPasswordInput] = useState("");
@@ -164,7 +163,7 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
- async function validateAccess(emailToCheck?: string, claimDevice = false, silent = false) {
+ async function validateAccess(emailToCheck?: string) {
   const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
 
   if (!cleanEmail) {
@@ -176,10 +175,8 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   }
 
   try {
-    if (!silent) {
-      setCheckingAccess(true);
-      setAccessMessage("");
-    }
+    setCheckingAccess(true);
+    setAccessMessage("");
 
     const deviceId = getDeviceId();
 
@@ -191,7 +188,6 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
   body: JSON.stringify({
     email: cleanEmail,
     device_id: deviceId,
-    claim_device: claimDevice,
   }),
 });
 
@@ -201,14 +197,7 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
       throw new Error(data?.message || "No se pudo validar el acceso.");
     }
 
-    
     const active = Boolean(data?.access_active);
-    // 🔥 detectar si ya canceló pero sigue activo hasta fin de periodo
-if (data?.subscription_status === "canceled") {
-  setSubscriptionCanceled(true);
-} else {
-  setSubscriptionCanceled(false);
-}
 // 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
 if (data?.device_mismatch) {
   setHasAccess(false);
@@ -242,9 +231,7 @@ setSubscriptionEndsAt(data?.current_period_end || "");
     setAccessMessage("No se pudo validar tu acceso. Intenta de nuevo.");
     return false;
   } finally {
-    if (!silent) {
-      setCheckingAccess(false);
-    }
+    setCheckingAccess(false);
   }
 }
 async function handleLogin() {
@@ -255,10 +242,6 @@ async function handleLogin() {
     setAccessMessage("Escribe tu correo y contraseña.");
     return;
   }
-
-  setViewMode("checking");
-  setCheckingAccess(true);
-  setAccessMessage("Validando tu acceso...");
 
   try {
     setLoginLoading(true);
@@ -274,7 +257,7 @@ async function handleLogin() {
     }
 
     setUserEmail(cleanEmail);
-    await validateAccess(cleanEmail, true);
+    await validateAccess(cleanEmail);
   } catch (error) {
     console.error("Error iniciando sesión:", error);
     setHasAccess(false);
@@ -357,7 +340,6 @@ async function handleCancelSubscription() {
       throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
     }
 
-    setSubscriptionCanceled(true);
     setShowCancelConfirmModal(false);
     setShowSubscriptionModal(true);
     setSubscriptionMessage(
@@ -422,7 +404,7 @@ async function handleCancelSubscription() {
 
       setUserEmail(email);
       setEmailInput(email);
-      await validateAccess(email, true);
+      await validateAccess(email);
     } catch (error) {
       console.error("Error revisando sesión:", error);
 
@@ -464,14 +446,14 @@ async function handleCancelSubscription() {
 
     setUserEmail(email);
     setEmailInput(email);
-    await validateAccess(email, true);
+    await validateAccess(email);
   });
 // 🔁 Revalidar acceso cada 24 horas
 const interval = setInterval(() => {
   if (userEmail) {
-    validateAccess(userEmail, false, true);
+    validateAccess(userEmail);
   }
-}, 15000 );
+}, 86400000 );
 
   return () => {
   isMounted = false;
@@ -975,6 +957,7 @@ if (viewMode === "expired") {
       onClick={() => {
         setShowMenu(false);
         setShowSubscriptionModal(true);
+        setSubscriptionMessage("");
       }}
       style={{
         background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
@@ -1457,9 +1440,7 @@ if (viewMode === "expired") {
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
       <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-        {subscriptionCanceled || subscriptionMessage
-  ? "Plan mensual cancelado"
-  : "Plan mensual activo"}
+        Plan mensual activo
       </div>
 
       <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
@@ -1481,27 +1462,24 @@ if (viewMode === "expired") {
       ) : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-
-        {/* 👇 SOLO aparece si NO está cancelado */}
-        {!subscriptionCanceled && !subscriptionMessage && (
-          <button
-            onClick={() => {
-  setShowSubscriptionModal(false);
-}}
-            style={{
-              background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-              color: "#ffffff",
-              border: "none",
-              padding: "12px 14px",
-              borderRadius: 16,
-              fontWeight: 900,
-              cursor: "pointer",
-              boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-            }}
-          >
-            Cancelar suscripción
-          </button>
-        )}
+        <button
+          onClick={() => {
+            setShowSubscriptionModal(false);
+            setShowCancelConfirmModal(true);
+          }}
+          style={{
+            background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+            color: "#ffffff",
+            border: "none",
+            padding: "12px 14px",
+            borderRadius: 16,
+            fontWeight: 900,
+            cursor: "pointer",
+            boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          Cancelar suscripción
+        </button>
 
         <button
           onClick={() => {
@@ -1510,9 +1488,8 @@ if (viewMode === "expired") {
           }}
           style={primaryButtonStyle}
         >
-          {subscriptionCanceled || subscriptionMessage ? "Entendido" : "Regresar a la app"}
+          Regresar a la app
         </button>
-
       </div>
     </div>
   </div>
