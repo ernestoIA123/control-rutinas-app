@@ -206,8 +206,6 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
     // 🔥 detectar si ya canceló pero sigue activo hasta fin de periodo
 if (data?.subscription_status === "canceled") {
   setSubscriptionCanceled(true);
-} else {
-  setSubscriptionCanceled(false);
 }
 // 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
 if (data?.device_mismatch) {
@@ -1298,7 +1296,8 @@ if (viewMode === "expired") {
                         }, 80);
                       }}
                       style={{
-                        background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                        background: "linear-gradient(180deg, #ffb347 0%, #ff8c1a 100%)",
+boxShadow: "0 6px 0 #a55407, 0 12px 18px rgba(0,0,0,0.25)",
                         color: "#ffffff",
                         border: "none",
                         padding: "12px 14px",
@@ -1457,7 +1456,7 @@ if (viewMode === "expired") {
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
       <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-        {subscriptionCanceled || subscriptionMessage
+        {subscriptionCanceled
   ? "Plan mensual cancelado"
   : "Plan mensual activo"}
       </div>
@@ -1483,7 +1482,7 @@ if (viewMode === "expired") {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
         {/* 👇 SOLO aparece si NO está cancelado */}
-        {!subscriptionCanceled && !subscriptionMessage && (
+        {!subscriptionCanceled && (
           <button
             onClick={() => {
   setShowSubscriptionModal(false);
