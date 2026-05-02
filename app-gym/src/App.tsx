@@ -1457,7 +1457,9 @@ if (viewMode === "expired") {
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
       <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-        {subscriptionCanceled ? "Plan mensual cancelado" : "Plan mensual activo"}
+        {subscriptionCanceled || subscriptionMessage
+  ? "Plan mensual cancelado"
+  : "Plan mensual activo"}
       </div>
 
       <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
@@ -1481,12 +1483,12 @@ if (viewMode === "expired") {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
         {/* 👇 SOLO aparece si NO está cancelado */}
-        {!subscriptionCanceled && (
+        {!subscriptionCanceled && !subscriptionMessage && (
           <button
             onClick={() => {
-              setShowSubscriptionModal(false);
-              setShowCancelConfirmModal(true);
-            }}
+  setShowSubscriptionModal(false);
+  setShowCancelConfirmModal(true);
+}}
             style={{
               background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
               color: "#ffffff",
@@ -1509,7 +1511,7 @@ if (viewMode === "expired") {
           }}
           style={primaryButtonStyle}
         >
-          {subscriptionCanceled ? "Entendido" : "Regresar a la app"}
+          {subscriptionCanceled || subscriptionMessage ? "Entendido" : "Regresar a la app"}
         </button>
 
       </div>
