@@ -205,7 +205,6 @@ export default function App() {
       const active = Boolean(data?.access_active);
       if (
         data?.subscription_status === "canceled" ||
-        data?.subscription_status === "inactive" ||
         data?.cancel_at_period_end === true
       ) {
         setSubscriptionCanceled(true);
