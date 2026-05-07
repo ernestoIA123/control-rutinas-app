@@ -359,7 +359,6 @@ export default function App() {
       if (data?.current_period_end) {
         setSubscriptionEndsAt(data.current_period_end);
       }
-      await validateAccess(userEmail);
     } catch (error) {
       console.error("Error cancelando suscripción:", error);
       setSubscriptionMessage("No se pudo cancelar la suscripción. Intenta de nuevo.");
@@ -964,10 +963,16 @@ export default function App() {
             }}
           >
             <button
-              onClick={() => {
+              onClick={async () => {
                 setShowMenu(false);
-                setShowSubscriptionModal(true);
+
+                // 🔥 refresca estado real del backend
+                if (userEmail) {
+                  await validateAccess(userEmail);
+                }
+
                 setSubscriptionMessage("");
+                setShowSubscriptionModal(true);
               }}
               style={{
                 background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
