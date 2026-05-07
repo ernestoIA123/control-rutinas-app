@@ -469,7 +469,15 @@ export default function App() {
       clearInterval(interval);
     };
   }, [userEmail]);
+  useEffect(() => {
+    if (!userEmail) return;
 
+    const saved = localStorage.getItem(`subscription_canceled_${userEmail}`);
+
+    if (saved === "true") {
+      setSubscriptionCanceled(true);
+    }
+  }, [userEmail]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutStatus = params.get("checkout");
@@ -1533,7 +1541,7 @@ export default function App() {
                   boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
                 }}
               >
-                {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
+                {cancelingSubscription ? "CANCELANDO..." : "Sí, cancelar renovación"}
               </button>
 
               <button
