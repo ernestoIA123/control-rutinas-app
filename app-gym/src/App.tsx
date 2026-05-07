@@ -22,6 +22,7 @@ type Routine = {
 };
 
 type ValidateAccessResponse = {
+  cancel_at_period_end?: boolean;
   ok: boolean;
   exists?: boolean;
   access_active?: boolean;
@@ -202,7 +203,11 @@ export default function App() {
       }
 
       const active = Boolean(data?.access_active);
-      if (data?.subscription_status === "canceled") {
+      if (
+        data?.subscription_status === "canceled" ||
+        data?.subscription_status === "inactive" ||
+        data?.cancel_at_period_end === true
+      ) {
         setSubscriptionCanceled(true);
       } else {
         setSubscriptionCanceled(false);
