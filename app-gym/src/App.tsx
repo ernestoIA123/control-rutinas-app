@@ -163,7 +163,10 @@ const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
- async function validateAccess(emailToCheck?: string) {
+ async function validateAccess(
+  emailToCheck?: string,
+  options?: { claimDevice?: boolean }
+) {
   const cleanEmail = (emailToCheck || userEmail || emailInput).trim().toLowerCase();
 
   if (!cleanEmail) {
@@ -186,9 +189,10 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    email: cleanEmail,
-    device_id: deviceId,
-  }),
+  email: cleanEmail,
+  device_id: deviceId,
+  claim_device: Boolean(options?.claimDevice),
+}),
 });
 
     const data: ValidateAccessResponse = await response.json();
@@ -199,7 +203,7 @@ const response = await fetch(`${BACKEND_URL}/validate-access`, {
 
     const active = Boolean(data?.access_active);
 // 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
-if (data?.device_mismatch) {
+if (data?.device_mismatch && !options?.claimDevice) {
   setHasAccess(false);
   setViewMode("login");
   setAccessMessage("Tu cuenta se abrió en otro dispositivo.");
@@ -257,7 +261,7 @@ async function handleLogin() {
     }
 
     setUserEmail(cleanEmail);
-    await validateAccess(cleanEmail);
+    await validateAccess(cleanEmail, { claimDevice: true });
   } catch (error) {
     console.error("Error iniciando sesión:", error);
     setHasAccess(false);
