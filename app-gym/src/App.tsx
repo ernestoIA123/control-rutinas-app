@@ -22,7 +22,6 @@ type Routine = {
 };
 
 type ValidateAccessResponse = {
-  cancel_at_period_end?: boolean;
   ok: boolean;
   exists?: boolean;
   access_active?: boolean;
@@ -160,6 +159,7 @@ export default function App() {
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const [subscriptionCanceled, setSubscriptionCanceled] = useState(false);
+
   const timerRef = useRef<number | null>(null);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -203,14 +203,6 @@ export default function App() {
       }
 
       const active = Boolean(data?.access_active);
-      if (
-        data?.subscription_status === "canceled" ||
-        data?.cancel_at_period_end === true
-      ) {
-        setSubscriptionCanceled(true);
-      } else {
-        setSubscriptionCanceled(false);
-      }
       // 🔴 BLOQUEAR SI ESTE DISPOSITIVO YA NO ES EL ACTIVO
       if (data?.device_mismatch && !options?.claimDevice) {
         setHasAccess(false);
@@ -353,16 +345,19 @@ export default function App() {
         throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
       }
 
+      setSubscriptionCanceled(true);
+      localStorage.setItem(`subscription_canceled_${cleanEmail}`, "true");
+
       setShowCancelConfirmModal(false);
       setShowSubscriptionModal(true);
-      setSubscriptionCanceled(true);
       setSubscriptionMessage(
-        "Puedes seguir usando la app hasta que venza tu plan mensual."
+        "Tu renovación fue cancelada. Puedes seguir usando la app hasta que termine tu periodo actual."
       );
 
       if (data?.current_period_end) {
         setSubscriptionEndsAt(data.current_period_end);
       }
+      await validateAccess(userEmail);
     } catch (error) {
       console.error("Error cancelando suscripción:", error);
       setSubscriptionMessage("No se pudo cancelar la suscripción. Intenta de nuevo.");
@@ -967,16 +962,10 @@ export default function App() {
             }}
           >
             <button
-              onClick={async () => {
+              onClick={() => {
                 setShowMenu(false);
-
-                // 🔥 refresca estado real del backend
-                if (userEmail) {
-                  await validateAccess(userEmail);
-                }
-
-                setSubscriptionMessage("");
                 setShowSubscriptionModal(true);
+                setSubscriptionMessage("");
               }}
               style={{
                 background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
@@ -1459,11 +1448,13 @@ export default function App() {
         <div style={modalOverlayStyle}>
           <div style={modalStyle}>
             <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-              {subscriptionCanceled ? "Suscripción cancelada" : "Plan mensual activo"}
+              {subscriptionCanceled ? "Renovación cancelada" : "Plan mensual activo"}
             </div>
 
-            <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
-              Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+            <div style={{ color: muted, fontSize: 16, marginBottom: 18, lineHeight: 1.5 }}>
+              {subscriptionCanceled
+                ? `Tu suscripción ya no se renovará automáticamente. Puedes seguir usando la app hasta el ${formatSubscriptionDate(subscriptionEndsAt)}.`
+                : `Tu suscripción está activa. Vence el ${formatSubscriptionDate(subscriptionEndsAt)}.`}
             </div>
 
             {subscriptionMessage ? (
@@ -1498,7 +1489,7 @@ export default function App() {
                     boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
                   }}
                 >
-                  Cancelar suscripción
+                  Cancelar renovación
                 </button>
               )}
 
@@ -1525,19 +1516,7 @@ export default function App() {
             <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
               ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
             </div>
-            {subscriptionMessage ? (
-              <div
-                style={{
-                  marginBottom: 16,
-                  color: "#ffd089",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  lineHeight: 1.5,
-                }}
-              >
-                {subscriptionMessage}
-              </div>
-            ) : null}
+
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
                 onClick={handleCancelSubscription}
@@ -1549,7 +1528,7 @@ export default function App() {
                   padding: "12px 14px",
                   borderRadius: 16,
                   fontWeight: 900,
-                  cursor: cancelingSubscription ? "not-allowed" : "pointer",
+                  cursor: "pointer",
                   opacity: cancelingSubscription ? 0.75 : 1,
                   boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
                 }}
