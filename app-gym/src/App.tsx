@@ -1525,7 +1525,19 @@ export default function App() {
             <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
               ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
             </div>
-
+            {subscriptionMessage ? (
+              <div
+                style={{
+                  marginBottom: 16,
+                  color: "#ffd089",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  lineHeight: 1.5,
+                }}
+              >
+                {subscriptionMessage}
+              </div>
+            ) : null}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
                 onClick={handleCancelSubscription}
@@ -1537,7 +1549,7 @@ export default function App() {
                   padding: "12px 14px",
                   borderRadius: 16,
                   fontWeight: 900,
-                  cursor: "pointer",
+                  cursor: cancelingSubscription ? "not-allowed" : "pointer",
                   opacity: cancelingSubscription ? 0.75 : 1,
                   boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
                 }}
