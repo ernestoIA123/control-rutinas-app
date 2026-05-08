@@ -346,7 +346,7 @@ export default function App() {
       if (!response.ok) {
         throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
       }
-
+      setCancelAtPeriodEnd(true);
       setShowCancelConfirmModal(false);
       setShowSubscriptionModal(true);
       setSubscriptionMessage(
@@ -1444,334 +1444,288 @@ export default function App() {
           </>
         )}
       </div>
-        { showSubscriptionModal && (
-          <div style={modalOverlayStyle}>
-            <div style={{ ...modalStyle, textAlign: "center" }}>
-              <h2
+      {showSubscriptionModal && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalStyle, textAlign: "center" }}>
+            <h2
+              style={{
+                marginTop: 0,
+                fontSize: 26,
+                color: "#ffffff",
+                fontWeight: 900,
+              }}
+            >
+              Estado de la suscripción
+            </h2>
+
+            {!cancelAtPeriodEnd ? (
+              <p style={{ color: "#b7ff31", fontSize: 22, fontWeight: 900 }}>
+                Activo
+              </p>
+            ) : (
+              <p style={{ color: "#ffd089", fontSize: 22, fontWeight: 900 }}>
+                Tu plan está cancelado
+              </p>
+            )}
+
+            <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
+              Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+            </div>
+
+            {subscriptionMessage ? (
+              <div
                 style={{
-                  marginTop: 0,
-                  fontSize: 26,
-                  color: "#ffffff",
-                  fontWeight: 900,
+                  marginBottom: 16,
+                  color: neonSoft,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  lineHeight: 1.5,
                 }}
               >
-                Estado de la suscripción
-              </h2>
+                {subscriptionMessage}
+              </div>
+            ) : null}
 
-              {!cancelAtPeriodEnd ? (
-                <p style={{ color: "#b7ff31", fontSize: 22, fontWeight: 900 }}>
-                  Activo
-                </p>
-              ) : (
-                <p style={{ color: "#ffd089", fontSize: 22, fontWeight: 900 }}>
-                  Tu plan está cancelado
-                </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {!cancelAtPeriodEnd && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={cancelingSubscription}
+                  style={{
+                    background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "13px",
+                    borderRadius: 16,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+                    opacity: cancelingSubscription ? 0.7 : 1,
+                  }}
+                >
+                  {cancelingSubscription ? "Cancelando..." : "Cancelar suscripción"}
+                </button>
               )}
 
-              <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
-                Vence: {formatSubscriptionDate(subscriptionEndsAt)}
-              </div>
-
-              {subscriptionMessage ? (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    color: neonSoft,
-                    fontSize: 14,
-                    fontWeight: 800,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {subscriptionMessage}
-                </div>
-              ) : null}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {!cancelAtPeriodEnd && (
-                  <button
-                    onClick={() => {
-                      setShowSubscriptionModal(false);
-                      setShowCancelConfirmModal(true);
-                    }}
-                    style={{
-                      background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                      color: "#ffffff",
-                      border: "none",
-                      padding: "13px",
-                      borderRadius: 16,
-                      fontWeight: 900,
-                      cursor: "pointer",
-                      boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                    }}
-                  >
-                    Cancelar suscripción
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    setShowSubscriptionModal(false);
-                    setSubscriptionMessage("");
-                  }}
-                  style={primaryButtonStyle}
-                >
-                  Regresar a la app
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setShowSubscriptionModal(false);
+                  setSubscriptionMessage("");
+                }}
+                style={primaryButtonStyle}
+              >
+                Regresar a la app
+              </button>
             </div>
           </div>
-        )}
-      {showCancelConfirmModal && (
-      <div style={modalOverlayStyle}>
-        <div style={modalStyle}>
-          <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
-            ¡Estás a punto de cancelar tu suscripción!
-          </div>
-
-          <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
-            ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <button
-              onClick={handleCancelSubscription}
-              disabled={cancelingSubscription}
-              style={{
-                background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                color: "#ffffff",
-                border: "none",
-                padding: "12px 14px",
-                borderRadius: 16,
-                fontWeight: 900,
-                cursor: "pointer",
-                opacity: cancelingSubscription ? 0.75 : 1,
-                boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-              }}
-            >
-              {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
-            </button>
-
-            <button
-              onClick={() => {
-                setShowCancelConfirmModal(false);
-                setShowSubscriptionModal(true);
-            
-              }}
-              style={primaryButtonStyle}
-            >
-              Regresar a la app
-            </button>
-          </div>
         </div>
-      </div>
-      )
-      }
-      {
-        showRoutineModal && (
-          <div style={modalOverlayStyle}>
-            <div style={modalStyle}>
-              <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 6 }}>
-                Crear siguiente ejercicio
+      )}
+
+      {showRoutineModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalStyle}>
+            <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 6 }}>
+              Crear siguiente ejercicio
+            </div>
+            <div style={{ color: muted, fontSize: 14, marginBottom: 18 }}>
+              Llena cada número según lo que harás en el gym.
+            </div>
+
+            <input
+              placeholder="Nombre del ejercicio"
+              value={exerciseName}
+              onChange={(e) => setExerciseName(e.target.value)}
+              style={inputStyle}
+            />
+
+            <div style={numberFieldsGridStyle}>
+              <div style={numberFieldWrapStyle}>
+                <input
+                  placeholder="4"
+                  value={sets}
+                  onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))}
+                  style={numberInputStyle}
+                />
+                <div style={numberFieldLabelStyle}>Series</div>
               </div>
-              <div style={{ color: muted, fontSize: 14, marginBottom: 18 }}>
-                Llena cada número según lo que harás en el gym.
+
+              <div style={numberFieldWrapStyle}>
+                <input
+                  placeholder="12"
+                  value={reps}
+                  onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))}
+                  style={numberInputStyle}
+                />
+                <div style={numberFieldLabelStyle}>Repeticiones</div>
               </div>
 
-              <input
-                placeholder="Nombre del ejercicio"
-                value={exerciseName}
-                onChange={(e) => setExerciseName(e.target.value)}
-                style={inputStyle}
-              />
+              <div style={{ ...numberFieldWrapStyle, alignItems: "stretch", position: "relative" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "stretch",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowRestPicker((prev) => !prev)}
+                    style={{
+                      ...numberInputStyle,
+                      margin: 0,
+                      flex: 1,
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {restValue}
+                  </button>
 
-              <div style={numberFieldsGridStyle}>
-                <div style={numberFieldWrapStyle}>
-                  <input
-                    placeholder="4"
-                    value={sets}
-                    onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))}
-                    style={numberInputStyle}
-                  />
-                  <div style={numberFieldLabelStyle}>Series</div>
-                </div>
-
-                <div style={numberFieldWrapStyle}>
-                  <input
-                    placeholder="12"
-                    value={reps}
-                    onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))}
-                    style={numberInputStyle}
-                  />
-                  <div style={numberFieldLabelStyle}>Repeticiones</div>
-                </div>
-
-                <div style={{ ...numberFieldWrapStyle, alignItems: "stretch", position: "relative" }}>
                   <div
                     style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "stretch",
-                      width: "100%",
+                      display: "grid",
+                      gridTemplateRows: "1fr 1fr",
+                      gap: 6,
+                      width: 70,
                       height: "100%",
                     }}
                   >
                     <button
                       type="button"
-                      onClick={() => setShowRestPicker((prev) => !prev)}
+                      onClick={() => setRestUnit("minutes")}
                       style={{
-                        ...numberInputStyle,
-                        margin: 0,
-                        flex: 1,
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        border: "none",
+                        borderRadius: 12,
+                        fontWeight: 900,
+                        fontSize: 13,
                         cursor: "pointer",
+                        background:
+                          restUnit === "minutes"
+                            ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                            : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                        color: restUnit === "minutes" ? "#0f190b" : text,
+                        boxShadow:
+                          restUnit === "minutes"
+                            ? "0 4px 0 #3f7010"
+                            : "0 4px 0 #090c0a",
                       }}
                     >
-                      {restValue}
+                      MIN
                     </button>
 
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => setRestUnit("seconds")}
                       style={{
-                        display: "grid",
-                        gridTemplateRows: "1fr 1fr",
-                        gap: 6,
-                        width: 70,
-                        height: "100%",
+                        border: "none",
+                        borderRadius: 12,
+                        fontWeight: 900,
+                        fontSize: 13,
+                        cursor: "pointer",
+                        background:
+                          restUnit === "seconds"
+                            ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                            : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                        color: restUnit === "seconds" ? "#0f190b" : text,
+                        boxShadow:
+                          restUnit === "seconds"
+                            ? "0 4px 0 #3f7010"
+                            : "0 4px 0 #090c0a",
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => setRestUnit("minutes")}
-                        style={{
-                          border: "none",
-                          borderRadius: 12,
-                          fontWeight: 900,
-                          fontSize: 13,
-                          cursor: "pointer",
-                          background:
-                            restUnit === "minutes"
-                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                          color: restUnit === "minutes" ? "#0f190b" : text,
-                          boxShadow:
-                            restUnit === "minutes"
-                              ? "0 4px 0 #3f7010"
-                              : "0 4px 0 #090c0a",
-                        }}
-                      >
-                        MIN
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRestUnit("seconds")}
-                        style={{
-                          border: "none",
-                          borderRadius: 12,
-                          fontWeight: 900,
-                          fontSize: 13,
-                          cursor: "pointer",
-                          background:
-                            restUnit === "seconds"
-                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                          color: restUnit === "seconds" ? "#0f190b" : text,
-                          boxShadow:
-                            restUnit === "seconds"
-                              ? "0 4px 0 #3f7010"
-                              : "0 4px 0 #090c0a",
-                        }}
-                      >
-                        SEG
-                      </button>
-                    </div>
+                      SEG
+                    </button>
                   </div>
-
-                  <div style={numberFieldLabelStyle}>Descanso</div>
-
-                  {showRestPicker && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "calc(100% + 8px)",
-                        left: 0,
-                        right: 0,
-                        maxHeight: 220,
-                        overflowY: "auto",
-                        borderRadius: 16,
-                        background: "linear-gradient(180deg, #121815 0%, #0e1310 100%)",
-                        border: `1px solid ${border}`,
-                        boxShadow: "0 18px 30px rgba(0,0,0,0.35)",
-                        padding: 8,
-                        zIndex: 50,
-                      }}
-                    >
-                      {Array.from({ length: 60 }, (_, i) => i + 1).map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => {
-                            setRestValue(String(value));
-                            setShowRestPicker(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            borderRadius: 12,
-                            padding: "12px 10px",
-                            marginBottom: 6,
-                            fontWeight: 900,
-                            fontSize: 14,
-                            textAlign: "center",
-                            cursor: "pointer",
-                            background:
-                              restValue === String(value)
-                                ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                                : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                            color: restValue === String(value) ? "#0f190b" : text,
-                            boxShadow:
-                              restValue === String(value)
-                                ? "0 4px 0 #3f7010"
-                                : "0 4px 0 #090c0a",
-                          }}
-                        >
-                          {value}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
-              </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button
-                  onClick={() => {
-                    setShowRoutineModal(false);
-                    resetRoutineForm();
-                  }}
-                  style={{
-                    flex: 1,
-                    background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 14px",
-                    borderRadius: 16,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                    boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  CERRAR
-                </button>
-                <button onClick={saveRoutine} style={{ ...primaryButtonStyle, flex: 1 }}>
-                  GUARDAR
-                </button>
+                <div style={numberFieldLabelStyle}>Descanso</div>
+
+                {showRestPicker && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      left: 0,
+                      right: 0,
+                      maxHeight: 220,
+                      overflowY: "auto",
+                      borderRadius: 16,
+                      background: "linear-gradient(180deg, #121815 0%, #0e1310 100%)",
+                      border: `1px solid ${border}`,
+                      boxShadow: "0 18px 30px rgba(0,0,0,0.35)",
+                      padding: 8,
+                      zIndex: 50,
+                    }}
+                  >
+                    {Array.from({ length: 60 }, (_, i) => i + 1).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          setRestValue(String(value));
+                          setShowRestPicker(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "12px 10px",
+                          marginBottom: 6,
+                          fontWeight: 900,
+                          fontSize: 14,
+                          textAlign: "center",
+                          cursor: "pointer",
+                          background:
+                            restValue === String(value)
+                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                          color: restValue === String(value) ? "#0f190b" : text,
+                          boxShadow:
+                            restValue === String(value)
+                              ? "0 4px 0 #3f7010"
+                              : "0 4px 0 #090c0a",
+                        }}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              <button
+                onClick={() => {
+                  setShowRoutineModal(false);
+                  resetRoutineForm();
+                }}
+                style={{
+                  flex: 1,
+                  background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "12px 14px",
+                  borderRadius: 16,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+                }}
+              >
+                CERRAR
+              </button>
+              <button onClick={saveRoutine} style={{ ...primaryButtonStyle, flex: 1 }}>
+                GUARDAR
+              </button>
+            </div>
           </div>
-        )
+        </div>
+      )
       }
 
       <style>{`
