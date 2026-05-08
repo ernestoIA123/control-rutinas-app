@@ -31,6 +31,7 @@ type ValidateAccessResponse = {
   message?: string;
   current_period_end?: string;
   device_mismatch?: boolean;
+  cancel_at_period_end?: boolean;
 };
 
 type ViewMode = "checking" | "login" | "expired" | "app";
@@ -156,9 +157,9 @@ export default function App() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
   const [subscriptionEndsAt, setSubscriptionEndsAt] = useState("");
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
-  const [subscriptionCanceled, setSubscriptionCanceled] = useState(false);
 
   const timerRef = useRef<number | null>(null);
   const queueAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -217,6 +218,7 @@ export default function App() {
       setUserEmail(cleanEmail);
       setEmailInput(cleanEmail);
       setSubscriptionEndsAt(data?.current_period_end || "");
+      setCancelAtPeriodEnd(Boolean(data?.cancel_at_period_end));
 
       if (active) {
         setViewMode("app");
@@ -345,13 +347,10 @@ export default function App() {
         throw new Error(data?.detail || "No se pudo cancelar la suscripción.");
       }
 
-      setSubscriptionCanceled(true);
-      localStorage.setItem(`subscription_canceled_${cleanEmail}`, "true");
-
       setShowCancelConfirmModal(false);
       setShowSubscriptionModal(true);
       setSubscriptionMessage(
-        "Tu renovación fue cancelada. Puedes seguir usando la app hasta que termine tu periodo actual."
+        "Tu suscripción fue cancelada. Puedes seguir usando la app hasta que venza tu plan mensual."
       );
 
       if (data?.current_period_end) {
@@ -469,15 +468,7 @@ export default function App() {
       clearInterval(interval);
     };
   }, [userEmail]);
-  useEffect(() => {
-    if (!userEmail) return;
 
-    const saved = localStorage.getItem(`subscription_canceled_${userEmail}`);
-
-    if (saved === "true") {
-      setSubscriptionCanceled(true);
-    }
-  }, [userEmail]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutStatus = params.get("checkout");
@@ -933,8 +924,6 @@ export default function App() {
           top: 20,
           right: 20,
           zIndex: 999,
-          display: "flex",
-          gap: 8,
         }}
       >
         <button
@@ -945,6 +934,7 @@ export default function App() {
             border: `1px solid ${border}`,
             padding: "10px 12px",
             borderRadius: 12,
+            fontSize: 20,
             fontWeight: 900,
             cursor: "pointer",
             boxShadow: "0 6px 0 #090c0a",
@@ -952,6 +942,7 @@ export default function App() {
         >
           ⚙️
         </button>
+
         {showMenu && (
           <div
             style={{
@@ -966,7 +957,7 @@ export default function App() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              minWidth: 220,
+              minWidth: 230,
             }}
           >
             <button
@@ -976,28 +967,30 @@ export default function App() {
                 setSubscriptionMessage("");
               }}
               style={{
+                width: "100%",
                 background: "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)",
                 color: "#0f190b",
                 border: "none",
-                padding: "10px 12px",
+                padding: "12px",
                 borderRadius: 8,
-                fontWeight: 800,
+                fontWeight: 900,
                 cursor: "pointer",
                 boxShadow: "0 6px 0 #3f7010",
               }}
             >
-              Detalles de suscripción
+              Detalles de la suscripción
             </button>
 
             <button
               onClick={handleLogout}
               style={{
+                width: "100%",
                 background: "#ff4d4f",
                 color: "#fff",
                 border: "none",
-                padding: "10px 12px",
+                padding: "12px",
                 borderRadius: 8,
-                fontWeight: 800,
+                fontWeight: 900,
                 cursor: "pointer",
               }}
             >
@@ -1005,7 +998,6 @@ export default function App() {
             </button>
           </div>
         )}
-
       </div>
 
       <div style={{ maxWidth: 520, margin: "0 auto" }}>
@@ -1452,41 +1444,313 @@ export default function App() {
           </>
         )}
       </div>
-      {showSubscriptionModal && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-              {subscriptionCanceled ? "Renovación cancelada" : "Plan mensual activo"}
-            </div>
-
-            <div style={{ color: muted, fontSize: 16, marginBottom: 18, lineHeight: 1.5 }}>
-              {subscriptionCanceled
-                ? `Tu suscripción ya no se renovará automáticamente. Puedes seguir usando la app hasta el ${formatSubscriptionDate(subscriptionEndsAt)}.`
-                : `Tu suscripción está activa. Vence el ${formatSubscriptionDate(subscriptionEndsAt)}.`}
-            </div>
-
-            {subscriptionMessage ? (
-              <div
-                style={{
-                  marginBottom: 16,
-                  color: neonSoft,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  lineHeight: 1.5,
-                }}
-              >
-                {subscriptionMessage}
+      {
+        showSubscriptionModal && (
+          <div style={modalOverlayStyle}>
+            <div style={modalStyle}>
+              <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
+                Plan mensual activo
               </div>
-            ) : null}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {!subscriptionCanceled && (
+              <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
+                Vence: {formatSubscriptionDate(subscriptionEndsAt)}
+              </div>
+
+              {subscriptionMessage ? (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    color: neonSoft,
+                    fontSize: 14,
+                    fontWeight: 800,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {subscriptionMessage}
+                </div>
+              ) : null}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {!cancelAtPeriodEnd ? (
+                  <button
+                    onClick={() => {
+                      setShowSubscriptionModal(false);
+                      setShowCancelConfirmModal(true);
+                    }}
+                    style={{
+                      background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "12px 14px",
+                      borderRadius: 16,
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    Cancelar suscripción
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      background: "#1a211d",
+                      color: "#ffffff",
+                      padding: "12px",
+                      borderRadius: 12,
+                      fontWeight: 900,
+                      textAlign: "center",
+                    }}
+                  >
+                    Tu plan está cancelado
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
                     setShowSubscriptionModal(false);
-                    setShowCancelConfirmModal(true);
+                    setSubscriptionMessage("");
+                  }}
+                  style={primaryButtonStyle}
+                >
+                  Regresar a la app
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {
+        showCancelConfirmModal && (
+          <div style={modalOverlayStyle}>
+            <div style={modalStyle}>
+              <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
+                ¡Estás a punto de cancelar tu suscripción!
+              </div>
+
+              <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
+                ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={cancelingSubscription}
+                  style={{
+                    background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "12px 14px",
+                    borderRadius: 16,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    opacity: cancelingSubscription ? 0.75 : 1,
+                    boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowCancelConfirmModal(false);
+                    setShowSubscriptionModal(true);
+                  }}
+                  style={primaryButtonStyle}
+                >
+                  Regresar a la app
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {
+        showRoutineModal && (
+          <div style={modalOverlayStyle}>
+            <div style={modalStyle}>
+              <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 6 }}>
+                Crear siguiente ejercicio
+              </div>
+              <div style={{ color: muted, fontSize: 14, marginBottom: 18 }}>
+                Llena cada número según lo que harás en el gym.
+              </div>
+
+              <input
+                placeholder="Nombre del ejercicio"
+                value={exerciseName}
+                onChange={(e) => setExerciseName(e.target.value)}
+                style={inputStyle}
+              />
+
+              <div style={numberFieldsGridStyle}>
+                <div style={numberFieldWrapStyle}>
+                  <input
+                    placeholder="4"
+                    value={sets}
+                    onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))}
+                    style={numberInputStyle}
+                  />
+                  <div style={numberFieldLabelStyle}>Series</div>
+                </div>
+
+                <div style={numberFieldWrapStyle}>
+                  <input
+                    placeholder="12"
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))}
+                    style={numberInputStyle}
+                  />
+                  <div style={numberFieldLabelStyle}>Repeticiones</div>
+                </div>
+
+                <div style={{ ...numberFieldWrapStyle, alignItems: "stretch", position: "relative" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "stretch",
+                      width: "100%",
+                      height: "100%",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowRestPicker((prev) => !prev)}
+                      style={{
+                        ...numberInputStyle,
+                        margin: 0,
+                        flex: 1,
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {restValue}
+                    </button>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateRows: "1fr 1fr",
+                        gap: 6,
+                        width: 70,
+                        height: "100%",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setRestUnit("minutes")}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          fontWeight: 900,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          background:
+                            restUnit === "minutes"
+                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                          color: restUnit === "minutes" ? "#0f190b" : text,
+                          boxShadow:
+                            restUnit === "minutes"
+                              ? "0 4px 0 #3f7010"
+                              : "0 4px 0 #090c0a",
+                        }}
+                      >
+                        MIN
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRestUnit("seconds")}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          fontWeight: 900,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          background:
+                            restUnit === "seconds"
+                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                          color: restUnit === "seconds" ? "#0f190b" : text,
+                          boxShadow:
+                            restUnit === "seconds"
+                              ? "0 4px 0 #3f7010"
+                              : "0 4px 0 #090c0a",
+                        }}
+                      >
+                        SEG
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={numberFieldLabelStyle}>Descanso</div>
+
+                  {showRestPicker && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 8px)",
+                        left: 0,
+                        right: 0,
+                        maxHeight: 220,
+                        overflowY: "auto",
+                        borderRadius: 16,
+                        background: "linear-gradient(180deg, #121815 0%, #0e1310 100%)",
+                        border: `1px solid ${border}`,
+                        boxShadow: "0 18px 30px rgba(0,0,0,0.35)",
+                        padding: 8,
+                        zIndex: 50,
+                      }}
+                    >
+                      {Array.from({ length: 60 }, (_, i) => i + 1).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            setRestValue(String(value));
+                            setShowRestPicker(false);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            borderRadius: 12,
+                            padding: "12px 10px",
+                            marginBottom: 6,
+                            fontWeight: 900,
+                            fontSize: 14,
+                            textAlign: "center",
+                            cursor: "pointer",
+                            background:
+                              restValue === String(value)
+                                ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
+                                : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
+                            color: restValue === String(value) ? "#0f190b" : text,
+                            boxShadow:
+                              restValue === String(value)
+                                ? "0 4px 0 #3f7010"
+                                : "0 4px 0 #090c0a",
+                          }}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <button
+                  onClick={() => {
+                    setShowRoutineModal(false);
+                    resetRoutineForm();
                   }}
                   style={{
+                    flex: 1,
                     background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
                     color: "#ffffff",
                     border: "none",
@@ -1497,271 +1761,16 @@ export default function App() {
                     boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
                   }}
                 >
-                  Cancelar renovación
+                  CERRAR
                 </button>
-              )}
-
-              <button
-                onClick={() => {
-                  setShowSubscriptionModal(false);
-                  setSubscriptionMessage("");
-                }}
-                style={primaryButtonStyle}
-              >
-                Regresar a la app
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showCancelConfirmModal && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
-              ¡Estás a punto de cancelar tu suscripción!
-            </div>
-
-            <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
-              ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button
-                onClick={handleCancelSubscription}
-                disabled={cancelingSubscription}
-                style={{
-                  background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "12px 14px",
-                  borderRadius: 16,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  opacity: cancelingSubscription ? 0.75 : 1,
-                  boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                }}
-              >
-                {cancelingSubscription ? "CANCELANDO..." : "Sí, cancelar renovación"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowCancelConfirmModal(false);
-                  setShowSubscriptionModal(true);
-                }}
-                style={primaryButtonStyle}
-              >
-                Regresar a la app
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showRoutineModal && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 6 }}>
-              Crear siguiente ejercicio
-            </div>
-            <div style={{ color: muted, fontSize: 14, marginBottom: 18 }}>
-              Llena cada número según lo que harás en el gym.
-            </div>
-
-            <input
-              placeholder="Nombre del ejercicio"
-              value={exerciseName}
-              onChange={(e) => setExerciseName(e.target.value)}
-              style={inputStyle}
-            />
-
-            <div style={numberFieldsGridStyle}>
-              <div style={numberFieldWrapStyle}>
-                <input
-                  placeholder="4"
-                  value={sets}
-                  onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))}
-                  style={numberInputStyle}
-                />
-                <div style={numberFieldLabelStyle}>Series</div>
-              </div>
-
-              <div style={numberFieldWrapStyle}>
-                <input
-                  placeholder="12"
-                  value={reps}
-                  onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))}
-                  style={numberInputStyle}
-                />
-                <div style={numberFieldLabelStyle}>Repeticiones</div>
-              </div>
-
-              <div style={{ ...numberFieldWrapStyle, alignItems: "stretch", position: "relative" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "stretch",
-                    width: "100%",
-                    height: "100%",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShowRestPicker((prev) => !prev)}
-                    style={{
-                      ...numberInputStyle,
-                      margin: 0,
-                      flex: 1,
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {restValue}
-                  </button>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateRows: "1fr 1fr",
-                      gap: 6,
-                      width: 70,
-                      height: "100%",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setRestUnit("minutes")}
-                      style={{
-                        border: "none",
-                        borderRadius: 12,
-                        fontWeight: 900,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        background:
-                          restUnit === "minutes"
-                            ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                            : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                        color: restUnit === "minutes" ? "#0f190b" : text,
-                        boxShadow:
-                          restUnit === "minutes"
-                            ? "0 4px 0 #3f7010"
-                            : "0 4px 0 #090c0a",
-                      }}
-                    >
-                      MIN
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRestUnit("seconds")}
-                      style={{
-                        border: "none",
-                        borderRadius: 12,
-                        fontWeight: 900,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        background:
-                          restUnit === "seconds"
-                            ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                            : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                        color: restUnit === "seconds" ? "#0f190b" : text,
-                        boxShadow:
-                          restUnit === "seconds"
-                            ? "0 4px 0 #3f7010"
-                            : "0 4px 0 #090c0a",
-                      }}
-                    >
-                      SEG
-                    </button>
-                  </div>
-                </div>
-
-                <div style={numberFieldLabelStyle}>Descanso</div>
-
-                {showRestPicker && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 8px)",
-                      left: 0,
-                      right: 0,
-                      maxHeight: 220,
-                      overflowY: "auto",
-                      borderRadius: 16,
-                      background: "linear-gradient(180deg, #121815 0%, #0e1310 100%)",
-                      border: `1px solid ${border}`,
-                      boxShadow: "0 18px 30px rgba(0,0,0,0.35)",
-                      padding: 8,
-                      zIndex: 50,
-                    }}
-                  >
-                    {Array.from({ length: 60 }, (_, i) => i + 1).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => {
-                          setRestValue(String(value));
-                          setShowRestPicker(false);
-                        }}
-                        style={{
-                          width: "100%",
-                          border: "none",
-                          borderRadius: 12,
-                          padding: "12px 10px",
-                          marginBottom: 6,
-                          fontWeight: 900,
-                          fontSize: 14,
-                          textAlign: "center",
-                          cursor: "pointer",
-                          background:
-                            restValue === String(value)
-                              ? "linear-gradient(180deg, #b7ff31 0%, #88ea16 100%)"
-                              : "linear-gradient(180deg, #1a211d 0%, #111612 100%)",
-                          color: restValue === String(value) ? "#0f190b" : text,
-                          boxShadow:
-                            restValue === String(value)
-                              ? "0 4px 0 #3f7010"
-                              : "0 4px 0 #090c0a",
-                        }}
-                      >
-                        {value}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <button onClick={saveRoutine} style={{ ...primaryButtonStyle, flex: 1 }}>
+                  GUARDAR
+                </button>
               </div>
             </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-              <button
-                onClick={() => {
-                  setShowRoutineModal(false);
-                  resetRoutineForm();
-                }}
-                style={{
-                  flex: 1,
-                  background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "12px 14px",
-                  borderRadius: 16,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                }}
-              >
-                CERRAR
-              </button>
-              <button onClick={saveRoutine} style={{ ...primaryButtonStyle, flex: 1 }}>
-                GUARDAR
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <style>{`
   @keyframes absorbDown {
@@ -1807,7 +1816,7 @@ export default function App() {
     }
   }
 `}</style>
-    </div>
+    </div >
   );
 }
 
