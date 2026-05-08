@@ -1444,13 +1444,29 @@ export default function App() {
           </>
         )}
       </div>
-      {
-        showSubscriptionModal && (
+        { showSubscriptionModal && (
           <div style={modalOverlayStyle}>
-            <div style={modalStyle}>
-              <div style={{ color: text, fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-                Plan mensual activo
-              </div>
+            <div style={{ ...modalStyle, textAlign: "center" }}>
+              <h2
+                style={{
+                  marginTop: 0,
+                  fontSize: 26,
+                  color: "#ffffff",
+                  fontWeight: 900,
+                }}
+              >
+                Estado de la suscripción
+              </h2>
+
+              {!cancelAtPeriodEnd ? (
+                <p style={{ color: "#b7ff31", fontSize: 22, fontWeight: 900 }}>
+                  Activo
+                </p>
+              ) : (
+                <p style={{ color: "#ffd089", fontSize: 22, fontWeight: 900 }}>
+                  Tu plan está cancelado
+                </p>
+              )}
 
               <div style={{ color: muted, fontSize: 16, marginBottom: 18 }}>
                 Vence: {formatSubscriptionDate(subscriptionEndsAt)}
@@ -1471,7 +1487,7 @@ export default function App() {
               ) : null}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {!cancelAtPeriodEnd ? (
+                {!cancelAtPeriodEnd && (
                   <button
                     onClick={() => {
                       setShowSubscriptionModal(false);
@@ -1481,7 +1497,7 @@ export default function App() {
                       background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
                       color: "#ffffff",
                       border: "none",
-                      padding: "12px 14px",
+                      padding: "13px",
                       borderRadius: 16,
                       fontWeight: 900,
                       cursor: "pointer",
@@ -1490,19 +1506,6 @@ export default function App() {
                   >
                     Cancelar suscripción
                   </button>
-                ) : (
-                  <div
-                    style={{
-                      background: "#1a211d",
-                      color: "#ffffff",
-                      padding: "12px",
-                      borderRadius: 12,
-                      fontWeight: 900,
-                      textAlign: "center",
-                    }}
-                  >
-                    Tu plan está cancelado
-                  </div>
                 )}
 
                 <button
@@ -1517,52 +1520,51 @@ export default function App() {
               </div>
             </div>
           </div>
-        )
-      }
-      {
-        showCancelConfirmModal && (
-          <div style={modalOverlayStyle}>
-            <div style={modalStyle}>
-              <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
-                ¡Estás a punto de cancelar tu suscripción!
-              </div>
-
-              <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
-                ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={cancelingSubscription}
-                  style={{
-                    background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 14px",
-                    borderRadius: 16,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                    opacity: cancelingSubscription ? 0.75 : 1,
-                    boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowCancelConfirmModal(false);
-                    setShowSubscriptionModal(true);
-                  }}
-                  style={primaryButtonStyle}
-                >
-                  Regresar a la app
-                </button>
-              </div>
-            </div>
+        )}
+      {showCancelConfirmModal && (
+      <div style={modalOverlayStyle}>
+        <div style={modalStyle}>
+          <div style={{ color: text, fontSize: 26, fontWeight: 900, marginBottom: 10 }}>
+            ¡Estás a punto de cancelar tu suscripción!
           </div>
-        )
+
+          <div style={{ color: muted, fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>
+            ¿Estás seguro de que quieres perder el acceso cuando tu plan mensual venza?
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              onClick={handleCancelSubscription}
+              disabled={cancelingSubscription}
+              style={{
+                background: "linear-gradient(180deg, #ff4d4f 0%, #b30000 100%)",
+                color: "#ffffff",
+                border: "none",
+                padding: "12px 14px",
+                borderRadius: 16,
+                fontWeight: 900,
+                cursor: "pointer",
+                opacity: cancelingSubscription ? 0.75 : 1,
+                boxShadow: "0 6px 0 #660000, 0 12px 18px rgba(0,0,0,0.25)",
+              }}
+            >
+              {cancelingSubscription ? "CANCELANDO..." : "Cancelar suscripción"}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowCancelConfirmModal(false);
+                setShowSubscriptionModal(true);
+            
+              }}
+              style={primaryButtonStyle}
+            >
+              Regresar a la app
+            </button>
+          </div>
+        </div>
+      </div>
+      )
       }
       {
         showRoutineModal && (
